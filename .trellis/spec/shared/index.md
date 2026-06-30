@@ -1,61 +1,31 @@
 # Shared Development Guidelines
 
-> These guidelines apply to all Electron applications using this architecture.
-
----
+These rules apply across Electron main, preload, renderer, and shared code.
 
 ## Documentation Files
 
-| File                                               | Description                       | When to Read           |
-| -------------------------------------------------- | --------------------------------- | ---------------------- |
-| [code-quality.md](./code-quality.md)               | Code quality mandatory rules      | Always                 |
-| [typescript.md](./typescript.md)                   | TypeScript best practices         | Type-related decisions |
-| [git-conventions.md](./git-conventions.md)         | Git commit and branch conventions | Before committing      |
-| [timestamp.md](./timestamp.md)                     | Timestamp format specification    | Date/time handling     |
-| [pnpm-electron-setup.md](./pnpm-electron-setup.md) | pnpm + Electron project setup     | Project initialization |
+| File | When to Read |
+| --- | --- |
+| [code-quality.md](./code-quality.md) | Always, before editing source |
+| [typescript.md](./typescript.md) | Type definitions, IPC contracts, Zod schemas |
+| [timestamp.md](./timestamp.md) | Logs, job progress, dates, durations |
+| [pnpm-electron-setup.md](./pnpm-electron-setup.md) | Dependency, build, package, or workspace changes |
+| [git-conventions.md](./git-conventions.md) | Before committing |
 
----
+## Current Project Facts
 
-## Quick Navigation
+- Root scripts in `package.json` delegate to `@office-tools/desktop` with `pnpm --filter @office-tools/desktop ...`.
+- `apps/desktop/eslint.config.mjs` enforces no explicit `any`, no non-null assertions, type-only imports, React Hooks rules, and `no-console` warnings.
+- `apps/desktop/tsconfig.json` uses `strict: true`, `moduleResolution: "Bundler"`, and path aliases for `@shared/*` and `@renderer/*`.
+- Shared runtime contracts live in `apps/desktop/src/shared`, not in a separate workspace package.
 
-| Task                  | File                                       |
-| --------------------- | ------------------------------------------ |
-| Code quality rules    | [code-quality.md](./code-quality.md)       |
-| Type annotations      | [typescript.md](./typescript.md)           |
-| Commit message format | [git-conventions.md](./git-conventions.md) |
-| Branch naming         | [git-conventions.md](./git-conventions.md) |
-| Timestamp handling    | [timestamp.md](./timestamp.md)             |
+## Mandatory Checks
 
----
+Run these from the repository root before reporting a code change complete:
 
-## Core Rules (MANDATORY)
+```bash
+pnpm lint
+pnpm typecheck
+```
 
-| Rule                                 | File                                       |
-| ------------------------------------ | ------------------------------------------ |
-| No non-null assertions (`!`)         | [code-quality.md](./code-quality.md)       |
-| Use explicit type annotations        | [typescript.md](./typescript.md)           |
-| Follow commit message format         | [git-conventions.md](./git-conventions.md) |
-| Use Unix milliseconds for timestamps | [timestamp.md](./timestamp.md)             |
-
----
-
-## Before Every Commit
-
-- [ ] `npm run lint` - 0 errors
-- [ ] `npm run typecheck` - 0 errors
-- [ ] No non-null assertions (`!`)
-- [ ] Commit message follows format
-- [ ] Tests pass (if applicable)
-
----
-
-## Code Review Checklist
-
-- [ ] Types are explicit, not `any`
-- [ ] Error handling is proper
-- [ ] Naming follows conventions
-- [ ] No duplicate code
-
----
-
-**Language**: All documentation must be written in **English**.
+Generated folders (`node_modules`, `.vite`, `out`, `dist`, `coverage`) are not source and should stay out of reviews and specs.

@@ -1,142 +1,39 @@
-# Type Safety Guidelines
+# Main Process Type Safety
 
-> Type safety patterns for TypeScript + Zod development.
+Reference files:
 
----
+- `apps/desktop/src/shared/types/api.ts`
+- `apps/desktop/src/shared/types/ipc.ts`
+- `apps/desktop/src/shared/types/preferences.ts`
+- `apps/desktop/src/shared/types/jobs.ts`
+- `apps/desktop/src/main/ipc/path.handler.ts`
+- `apps/desktop/src/preload/index.ts`
 
-## No Non-Null Assertions
+## Validate Boundaries
 
-```typescript
-// WRONG
-const name = user!.name;
+IPC arguments arrive as untrusted data. Type handler arguments as `unknown`, validate with a shared Zod schema, then pass typed data to services.
 
-// CORRECT
-const user = db.select().from(users).where(eq(users.id, id)).get();
-if (!user) {
-  throw new Error('User not found');
-}
-const name = user.name;
-```
+Current pattern:
 
----
+- `setLastOutputDirectoryInputSchema` is defined in shared code.
+- `path.handler.ts` calls `safeParse(input)`.
+- Only `parsedInput.data.directory` reaches `setLastOutputDirectory`.
 
-## Discriminated Union Narrowing
+## Keep Contracts Shared
 
-Use strict equality for type narrowing:
+`OfficeToolsApi` is the single contract for preload and renderer. When changing it, update:
 
-```typescript
-type Result = { success: true; data: string } | { success: false; error: string };
+- `src/shared/types/ipc.ts`
+- `src/preload/index.ts`
+- renderer call sites
+- `src/renderer/src/vite-env.d.ts` only if the global shape changes
 
-// CORRECT: Use === true
-if (result.success === true) {
-  console.log(result.data);
-} else {
-  console.log(result.error);
-}
+## Use Serializable DTOs
 
-// WRONG: Truthy check may not narrow
-if (result.success) {
-  console.log(result.data);
-} else {
-  console.log(result.error); // May cause type error
-}
-```
+IPC payloads should be serializable plain data. Use strings, numbers, booleans, arrays, and objects. Avoid `Date`, `Map`, `Set`, `Error`, functions, DOM objects, and Electron objects.
 
----
+The file registry pattern is the preferred way to represent local files across IPC: renderer receives metadata plus `sourceId`; main process keeps actual paths.
 
-## Zod Schema for All Types
+## Imports
 
-```typescript
-import { z } from 'zod';
-
-// Input schemas
-export const createUserInputSchema = z.object({
-  email: z.string().email('Invalid email'),
-  name: z.string().min(1, 'Name required'),
-});
-
-// Entity schemas (for API responses - use z.number() for timestamps)
-export const userSchema = z.object({
-  id: z.string(),
-  email: z.string().email(),
-  name: z.string(),
-  createdAt: z.number(), // Unix milliseconds
-});
-
-// Inferred types
-export type CreateUserInput = z.infer<typeof createUserInputSchema>;
-export type User = z.infer<typeof userSchema>;
-```
-
----
-
-## Zod Error Handling
-
-```typescript
-const parseResult = schema.safeParse(input);
-
-if (!parseResult.success) {
-  // CORRECT: Use .issues
-  const error = parseResult.error.issues[0].message;
-  return { success: false, error };
-}
-
-// WRONG: .errors doesn't exist
-parseResult.error.errors; // TypeScript error!
-```
-
----
-
-## Type Imports
-
-```typescript
-// CORRECT
-import type { User, Project } from './types';
-import { createUser } from './procedures';
-
-// Also acceptable
-import { type User, createUser } from './types';
-```
-
----
-
-## Explicit Return Types
-
-```typescript
-// WRONG
-export function getUser(id: string) {
-  return db.query.users.findFirst({ where: eq(users.id, id) });
-}
-
-// CORRECT
-export function getUser(id: string): User | undefined {
-  return db.query.users.findFirst({ where: eq(users.id, id) });
-}
-```
-
----
-
-## Avoid `any`
-
-```typescript
-// WRONG
-function process(data: any) { ... }
-
-// CORRECT
-function process(data: ProcessInput) { ... }
-function process(data: unknown) { ... }
-```
-
----
-
-## Summary
-
-| Rule                        | Reason                 |
-| --------------------------- | ---------------------- |
-| No `!` assertions           | Runtime errors         |
-| Use `=== true` for unions   | Proper narrowing       |
-| Zod-first types             | Single source of truth |
-| Use `.issues` not `.errors` | Correct Zod API        |
-| `import type` for types     | Clear separation       |
-| Explicit return types       | Documentation          |
-| Avoid `any`                 | Type safety            |
+Use `import type` for type-only imports. Keep shared types free of Node/Electron imports so they can compile in renderer code.

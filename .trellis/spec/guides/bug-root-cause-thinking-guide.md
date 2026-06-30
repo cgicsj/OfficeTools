@@ -371,7 +371,7 @@ After analyzing a bug, add lessons to the appropriate guide:
 | Cross-layer issue     | `cross-layer-thinking-guide.md` |
 | New third-party quirk | Project documentation           |
 | Missing domain spec   | Relevant spec document          |
-| Database/ORM issue    | `db-schema-change-guide.md`     |
+| New storage layer issue | Add or update a source-backed spec first |
 
 ---
 

@@ -1,256 +1,55 @@
-# TypeScript Best Practices
+# TypeScript
 
-> TypeScript guidelines for Electron applications.
+OfficeTools is a strict TypeScript project. Favor explicit contracts at runtime boundaries and keep shared types serializable.
 
----
+Reference files:
 
-## Explicit Return Types
+- `apps/desktop/tsconfig.json`
+- `apps/desktop/src/shared/types/api.ts`
+- `apps/desktop/src/shared/types/ipc.ts`
+- `apps/desktop/src/shared/types/jobs.ts`
+- `apps/desktop/src/shared/types/preferences.ts`
+- `apps/desktop/src/shared/constants/channels.ts`
+- `apps/desktop/src/shared/constants/config.ts`
 
-Always use explicit return types for exported functions:
+## Shared Contracts
 
-```typescript
-// BAD - Implicit return type
-export function getUser(id: string) {
-  return db.query.users.findFirst({ where: eq(users.id, id) });
-}
+Shared contracts live under `apps/desktop/src/shared`. They are used by main, preload, and renderer code, so keep them free of Electron, React, and Node-only runtime imports.
 
-// GOOD - Explicit return type
-export function getUser(id: string): User | undefined {
-  return db.query.users.findFirst({ where: eq(users.id, id) });
-}
+Use discriminated unions for cross-layer results and events:
 
-// GOOD - Async with Promise
-export async function getUser(id: string): Promise<User | undefined> {
-  return db.query.users.findFirst({ where: eq(users.id, id) });
-}
-```
+- `ApiResult<T>` uses `success: true` with `data` and `success: false` with `error` plus optional `code`.
+- `JobEvent` uses a `type` discriminator for `log`, `progress`, and `file-status` payloads.
 
----
+When reading an `ApiResult`, compare with `result.success === true` or `result.success === false` so TypeScript narrows correctly.
 
-## Use `type` for Object Types
+## Runtime Validation
 
-```typescript
-// Use type for most cases
-type User = {
-  id: string;
-  name: string;
-  email: string;
-};
+Use Zod for data that crosses a trust boundary or is read from disk. Current examples:
 
-// Use interface when you expect extension
-interface Plugin {
-  name: string;
-  init(): void;
-}
+- `setLastOutputDirectoryInputSchema` validates raw IPC input in `src/main/ipc/path.handler.ts`.
+- `preferencesFileSchema` validates `preferences.json` in `src/main/services/preferences/preferences.ts`.
 
-interface AdvancedPlugin extends Plugin {
-  cleanup(): void;
-}
-```
+Take raw IPC payloads as `unknown`, validate with `safeParse`, and only pass `parsed.data` into services.
 
----
+## Constants
 
-## Type Imports
+Use `as const` for nested constants that define stable runtime values:
 
-Always use `import type` for type-only imports:
+- `IPC_CHANNELS` in `src/shared/constants/channels.ts`
+- `APP_CONFIG` in `src/shared/constants/config.ts`
 
-```typescript
-// GOOD
-import type { User, Project } from './types';
-import { createUser } from './procedures';
+Add new channels or app limits in these shared constants before wiring the main/preload/renderer layers.
 
-// Also acceptable
-import { type User, createUser } from './types';
+## Imports
 
-// BAD - Mixed imports without type annotation
-import { User, createUser } from './types';
-```
+- Renderer code uses the `@shared/*` alias for shared contracts.
+- Main and preload currently use relative imports to `src/shared`. Keep that style consistent unless the whole layer is intentionally migrated.
+- Use `import type` for type-only imports.
 
----
+## Avoid
 
-## Zod Schema for Runtime Validation
-
-Use Zod for all external data validation:
-
-```typescript
-import { z } from 'zod';
-
-// Define schema
-const userInputSchema = z.object({
-  name: z.string().min(1).max(100),
-  email: z.string().email(),
-  age: z.number().int().min(0).optional(),
-});
-
-// Derive type from schema
-type UserInput = z.infer<typeof userInputSchema>;
-
-// Validate input
-const parseResult = userInputSchema.safeParse(rawInput);
-if (!parseResult.success) {
-  return { success: false, error: parseResult.error.issues[0].message };
-}
-const validInput = parseResult.data;
-```
-
----
-
-## Discriminated Unions
-
-Use strict equality for type narrowing:
-
-```typescript
-type Result = { success: true; data: string } | { success: false; error: string };
-
-const result: Result = doSomething();
-
-// CORRECT: Use === true
-if (result.success === true) {
-  console.log(result.data); // TypeScript knows data exists
-} else {
-  console.log(result.error); // TypeScript knows error exists
-}
-
-// WRONG: Truthy check may not narrow properly
-if (result.success) {
-  console.log(result.data);
-} else {
-  console.log(result.error); // May cause type error
-}
-```
-
----
-
-## Type Guards
-
-Create type guards for runtime type checking:
-
-```typescript
-// Type guard function
-function isUser(value: unknown): value is User {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'id' in value &&
-    'email' in value &&
-    typeof (value as User).id === 'string' &&
-    typeof (value as User).email === 'string'
-  );
-}
-
-// Usage
-const data: unknown = JSON.parse(response);
-if (isUser(data)) {
-  console.log(data.email); // TypeScript knows it's a User
-}
-
-// With Zod (simpler)
-const parseResult = userSchema.safeParse(data);
-if (parseResult.success) {
-  console.log(parseResult.data.email); // Type-safe
-}
-```
-
----
-
-## Generics
-
-Use generics for reusable type-safe functions:
-
-```typescript
-// Generic function
-function first<T>(items: T[]): T | undefined {
-  return items[0];
-}
-
-// Generic with constraints
-function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
-  return obj[key];
-}
-
-// Generic type
-type Result<T> = { success: true; data: T } | { success: false; error: string };
-
-function createResult<T>(data: T): Result<T> {
-  return { success: true, data };
-}
-```
-
----
-
-## Utility Types
-
-Use built-in utility types:
-
-```typescript
-// Partial - all properties optional
-type PartialUser = Partial<User>;
-
-// Required - all properties required
-type RequiredUser = Required<User>;
-
-// Pick - select specific properties
-type UserName = Pick<User, 'name' | 'email'>;
-
-// Omit - exclude specific properties
-type UserWithoutId = Omit<User, 'id'>;
-
-// Record - key-value mapping
-type UserMap = Record<string, User>;
-
-// ReturnType - extract function return type
-type CreateResult = ReturnType<typeof createUser>;
-```
-
----
-
-## Avoid Common Pitfalls
-
-### Don't use `any`
-
-```typescript
-// BAD
-function process(data: any) { ... }
-
-// GOOD
-function process(data: unknown) { ... }
-function process(data: ProcessInput) { ... }
-```
-
-### Don't use non-null assertion
-
-```typescript
-// BAD
-const name = user!.name;
-
-// GOOD
-if (user) {
-  const name = user.name;
-}
-```
-
-### Don't ignore TypeScript errors
-
-```typescript
-// BAD
-// @ts-ignore
-doSomething(invalidArg);
-
-// GOOD - Fix the type issue
-doSomething(validArg);
-```
-
----
-
-## Summary
-
-| Practice              | Reason                      |
-| --------------------- | --------------------------- |
-| Explicit return types | Documentation, catch errors |
-| `import type`         | Clear separation            |
-| Zod for validation    | Runtime type safety         |
-| `=== true` for unions | Proper narrowing            |
-| Type guards           | Runtime checks              |
-| Generics              | Reusability                 |
-| Utility types         | DRY types                   |
-| Avoid `any`           | Type safety                 |
+- Non-serializable values in shared types.
+- `Date` objects crossing IPC; use numbers such as `timestampMs`.
+- `any`, non-null assertions, and `@ts-ignore`.
+- Type definitions duplicated separately in main, preload, and renderer.

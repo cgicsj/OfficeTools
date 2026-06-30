@@ -1,109 +1,46 @@
-# Environment Configuration
+# Environment and Packaging
 
-> Guidelines for separating development and production environments.
+Reference files:
 
----
+- `apps/desktop/src/main/env-setup.ts`
+- `apps/desktop/src/main/index.ts`
+- `apps/desktop/forge.config.ts`
+- `apps/desktop/vite.main.config.ts`
+- `apps/desktop/vite.preload.config.ts`
+- `apps/desktop/vite.renderer.config.ts`
+- `.gitignore`
+- `apps/desktop/eslint.config.mjs`
 
-## Dev/Prod Data Isolation
+## userData Isolation
 
-### The Problem
+`src/main/env-setup.ts` appends `-dev` to Electron `userData` when `app.isPackaged` is false. Keep importing `./env-setup` before code that reads or writes app data, preferences, cache, or job files.
 
-By default, Electron's `userData` is the same for dev and prod:
+`src/main/index.ts` currently imports `./env-setup` before registering IPC handlers and creating the window. Preserve that ordering.
 
-- Dev and prod share the same data
-- Testing can corrupt data
-- Can't run both simultaneously
+## BrowserWindow Security Baseline
 
-### The Solution
+The main window uses:
 
-```typescript
-// src/main/env-setup.ts
-import { app } from 'electron';
+- `contextIsolation: true`
+- `nodeIntegration: false`
+- preload script from the Vite build output
 
-if (!app.isPackaged) {
-  const devUserData = app.getPath('userData') + '-dev';
-  app.setPath('userData', devUserData);
-}
+Do not weaken these settings to solve renderer access problems. Add a typed preload API instead.
 
-export {};
-```
+## Vite Build Entries
 
-**Import order matters:**
+Electron Forge owns the build entries:
 
-```typescript
-// src/main/index.ts
-import { app } from 'electron';
-import './env-setup'; // MUST be first after electron import
+- main: `src/main/index.ts`
+- preload: `src/preload/index.ts`
+- renderer: `main_window`
 
-// Now safe to import modules that use electron-store
-import Store from 'electron-store';
-```
+Main and preload output names are fixed to `main.js` and `preload.js`, matching `BrowserWindow` startup code.
 
----
+## Packaging
 
-## Why a Separate Module?
+Forge config currently enables ASAR packaging, configures the Debian maker, and applies Electron fuses. If native modules are added for Excel processing, revisit packaging with a real package/build check and update this spec.
 
-ESM hoists imports, so this won't work:
+## Generated Files
 
-```typescript
-// WRONG
-import { app } from "electron";
-if (!app.isPackaged) {
-  app.setPath("userData", ...); // Runs AFTER all imports
-}
-import Store from "electron-store"; // Already initialized!
-```
-
-With a separate module:
-
-```typescript
-// CORRECT
-import { app } from 'electron';
-import './env-setup'; // Side effect runs during import
-import Store from 'electron-store'; // Now uses correct path
-```
-
----
-
-## Detection Methods
-
-| Method                 | Use Case                                       |
-| ---------------------- | ---------------------------------------------- |
-| `app.isPackaged`       | Recommended - true when running from .app/.exe |
-| `process.env.NODE_ENV` | Alternative - depends on build config          |
-
----
-
-## What Gets Isolated
-
-| Data Type      | Dev Path         | Prod Path    |
-| -------------- | ---------------- | ------------ |
-| electron-store | `App-dev/*.json` | `App/*.json` |
-| Cookies        | `App-dev/`       | `App/`       |
-| Logs           | `App-dev/logs/`  | `App/logs/`  |
-
----
-
-## Database Path Exception
-
-Keep database in project for easy inspection during dev:
-
-```typescript
-const getDbPath = () => {
-  if (process.env.NODE_ENV === 'development') {
-    return './app-dev.db'; // Project directory
-  }
-  return path.join(app.getPath('userData'), 'app.db');
-};
-```
-
----
-
-## Summary
-
-| Rule                        | Reason                     |
-| --------------------------- | -------------------------- |
-| Isolate dev/prod userData   | Prevent data corruption    |
-| Use `app.isPackaged`        | Most reliable detection    |
-| Set path in separate module | ESM hoisting               |
-| Import env-setup first      | Before any userData access |
+Do not edit or commit generated `.vite`, `out`, or `dist` output. `.gitignore` and ESLint both exclude these paths.

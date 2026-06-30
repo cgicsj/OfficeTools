@@ -1,232 +1,46 @@
-# Code Quality Guidelines
+# Code Quality
 
-> Mandatory code quality rules for all Electron applications.
+OfficeTools uses strict TypeScript plus ESLint as the baseline quality gate.
 
----
+Reference files:
 
-## No Non-Null Assertions
+- `apps/desktop/eslint.config.mjs`
+- `apps/desktop/tsconfig.json`
+- `package.json`
+- `apps/desktop/package.json`
 
-**NEVER** use non-null assertions (`!`). They bypass TypeScript's null checking and lead to runtime errors.
+## Required Checks
 
-```typescript
-// FORBIDDEN
-const name = user!.name;
-const value = data!.items![0]!;
-
-// REQUIRED - Use explicit checks
-const user = getUser();
-if (!user) {
-  throw new Error('User not found');
-}
-const name = user.name;
-
-// REQUIRED - Use optional chaining with fallback
-const value = data?.items?.[0] ?? defaultValue;
-
-// REQUIRED - Use local variable after null check
-const project = getProject(id);
-if (!project) {
-  return { success: false, error: 'Project not found' };
-}
-// Now project is narrowed to non-null
-const projectName = project.name;
-```
-
----
-
-## Avoid `any` Type
-
-```typescript
-// BAD
-function process(data: any) { ... }
-
-// GOOD - Use proper types
-function process(data: ProcessInput) { ... }
-
-// GOOD - Use unknown for truly unknown data
-function parseJSON(input: string): unknown {
-  return JSON.parse(input);
-}
-```
-
----
-
-## Lint and Type Check Before Commit
+Run from the repository root:
 
 ```bash
-# MUST pass before every commit
-npm run lint
-npm run typecheck
-
-# Or combined
-npm run lint && npm run typecheck
+pnpm lint
+pnpm typecheck
 ```
 
----
+The root scripts delegate to the desktop package. The desktop package runs `eslint . --max-warnings 0` and `tsc --noEmit`.
 
-## Naming Conventions
+## Type Safety Rules
 
-### Files and Directories
+- Do not use explicit `any`; use a concrete type or `unknown` plus validation.
+- Do not use non-null assertions. Narrow with an `if` guard, optional chaining, or a fallback.
+- Use `import type` for type-only imports.
+- Exported functions should declare return types. Current examples include `createMainWindow(): BrowserWindow`, `registerIpcHandlers(): void`, and `registerSelectedFiles(...): Promise<SelectedFile[]>`.
 
-| Type            | Convention                  | Example                     |
-| --------------- | --------------------------- | --------------------------- |
-| React Component | PascalCase                  | `UserProfile.tsx`           |
-| Hook            | camelCase with `use` prefix | `useProject.ts`             |
-| Utility         | kebab-case                  | `date-utils.ts`             |
-| Type file       | kebab-case or `types.ts`    | `types.ts`, `user-types.ts` |
-| Test file       | Same name + `.test`         | `date-utils.test.ts`        |
-| Directory       | kebab-case                  | `user-profile/`             |
+## Console and Logging
 
-### Variables and Functions
+`no-console` is configured as a warning and lint runs with `--max-warnings 0`. Do not add `console.log`, `console.warn`, or `console.error` as application logging. If a future feature needs durable logging, add a main-process logging service and document it before using it broadly.
 
-| Type           | Convention                                  | Example                            |
-| -------------- | ------------------------------------------- | ---------------------------------- |
-| Variable       | camelCase                                   | `userName`, `isActive`             |
-| Constant       | SCREAMING_SNAKE_CASE                        | `MAX_RETRY_COUNT`                  |
-| Function       | camelCase                                   | `getUserById`                      |
-| Class          | PascalCase                                  | `UserService`                      |
-| Type/Interface | PascalCase                                  | `UserInput`, `ProjectOutput`       |
-| Enum           | PascalCase (type), SCREAMING_SNAKE (values) | `enum Status { ACTIVE, INACTIVE }` |
+## File and Naming Conventions
 
-### Boolean Variables
+- React component files are PascalCase, for example `components/workflows/SplitWorkflow.tsx`.
+- Main-process handler files use `<domain>.handler.ts`, for example `src/main/ipc/path.handler.ts`.
+- Main-process services live under a domain directory, for example `src/main/services/preferences/preferences.ts`.
+- Shared constants use uppercase object names with `as const`, for example `IPC_CHANNELS` and `APP_CONFIG`.
+- Shared object and union types use PascalCase, for example `ApiResult<T>`, `JobEvent`, and `WorkflowTab`.
 
-Use `is`, `has`, `should`, `can` prefixes:
+## Source Boundaries
 
-```typescript
-// GOOD
-const isLoading = true;
-const hasPermission = user.role === 'admin';
-const shouldRefresh = Date.now() > expiresAt;
-const canEdit = isOwner || hasPermission;
-
-// BAD
-const loading = true;
-const permission = user.role === 'admin';
-```
-
----
-
-## Error Handling
-
-### Use Structured Errors
-
-```typescript
-// Define error types
-class AppError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public statusCode: number = 500
-  ) {
-    super(message);
-    this.name = 'AppError';
-  }
-}
-
-// Specific error types
-class NotFoundError extends AppError {
-  constructor(resource: string, id: string) {
-    super(`${resource} not found: ${id}`, 'NOT_FOUND', 404);
-  }
-}
-
-class ValidationError extends AppError {
-  constructor(message: string) {
-    super(message, 'VALIDATION_ERROR', 400);
-  }
-}
-```
-
-### Error Response Format
-
-```typescript
-// Consistent error response
-interface ErrorResponse {
-  success: false;
-  error: string;
-  code?: string;
-}
-
-// Example
-return {
-  success: false,
-  error: 'Invalid input',
-  code: 'VALIDATION_ERROR',
-};
-```
-
-### Never Swallow Errors
-
-```typescript
-// BAD - Swallowing error
-try {
-  await dangerousOperation();
-} catch (e) {
-  // Silent failure
-}
-
-// GOOD - Log and handle
-try {
-  await dangerousOperation();
-} catch (error) {
-  logger.error('operation_failed', { error });
-  throw new AppError('Operation failed', 'OPERATION_FAILED');
-}
-```
-
----
-
-## Testing Guidelines
-
-### Test File Location
-
-```
-src/
-├── utils/
-│   ├── date-utils.ts
-│   └── date-utils.test.ts    # Co-located test
-└── __tests__/                 # Integration tests
-    └── api.test.ts
-```
-
-### Test Naming
-
-```typescript
-describe("DateUtils", () => {
-  describe("formatDate", () => {
-    it("should format date in ISO format", () => { ... });
-    it("should handle null input", () => { ... });
-    it("should throw on invalid date", () => { ... });
-  });
-});
-```
-
-### Test Structure (AAA Pattern)
-
-```typescript
-it('should create a project', async () => {
-  // Arrange
-  const input = { name: 'Test Project' };
-
-  // Act
-  const result = createProject(input);
-
-  // Assert
-  expect(result.success).toBe(true);
-  expect(result.project.name).toBe('Test Project');
-});
-```
-
----
-
-## Summary
-
-| Rule                    | Reason              |
-| ----------------------- | ------------------- |
-| No `!` assertions       | Runtime errors      |
-| No `any` type           | Type safety         |
-| Lint before commit      | Consistent code     |
-| Typecheck before commit | Catch type errors   |
-| Semantic naming         | Readability         |
-| Structured errors       | Consistent handling |
-| Never swallow errors    | Debuggability       |
+- Keep Electron and Node APIs in the main process or preload. Renderer code should call `window.officeTools`.
+- Keep shared types and serializable constants in `apps/desktop/src/shared`.
+- Do not import generated files from `.vite`, `out`, or `dist`.

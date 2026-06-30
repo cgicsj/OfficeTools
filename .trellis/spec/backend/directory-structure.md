@@ -1,152 +1,65 @@
-# Directory Structure
+# Main Process Directory Structure
 
-> Domain-driven directory layout for Electron main process.
+Reference directories:
 
----
+- `apps/desktop/src/main`
+- `apps/desktop/src/preload`
+- `apps/desktop/src/shared`
 
-## Main Process Structure
+## Current Layout
 
-```
-src/main/
-├── index.ts              # Main process entry
-├── db/                   # Database layer
-│   ├── client.ts         # Drizzle client initialization
-│   ├── schema.ts         # All table schemas
-│   └── migrate.ts        # Migration logic
-├── ipc/                  # IPC handlers (thin layer)
-│   ├── index.ts          # Register all handlers
-│   ├── project.handler.ts
-│   └── user.handler.ts
-└── services/             # Business logic (domain-driven)
-    ├── {domain}/         # One folder per domain
-    │   ├── types.ts      # Zod schemas + TypeScript types (REQUIRED)
-    │   ├── procedures/   # Endpoint handlers (REQUIRED)
-    │   │   ├── create.ts
-    │   │   ├── list.ts
-    │   │   ├── get.ts
-    │   │   ├── update.ts
-    │   │   └── delete.ts
-    │   └── lib/          # Shared business logic (OPTIONAL)
-    │       ├── helpers.ts
-    │       └── cache.ts
-    ├── project/          # Example: Project domain
-    │   ├── types.ts
-    │   ├── procedures/
-    │   │   ├── create.ts
-    │   │   ├── list.ts
-    │   │   ├── get.ts
-    │   │   ├── update.ts
-    │   │   └── delete.ts
-    │   └── lib/
-    │       └── cache.ts
-    ├── user/             # Example: User domain
-    │   ├── types.ts
-    │   ├── procedures/
-    │   │   ├── get.ts
-    │   │   └── update.ts
-    │   └── lib/
-    │       └── helpers.ts
-    └── logger.ts         # Shared logger (not a domain)
+```text
+apps/desktop/src/
+  main/
+    env-setup.ts
+    index.ts
+    ipc/
+      index.ts
+      dialog.handler.ts
+      job.handler.ts
+      path.handler.ts
+    services/
+      file-selection/file-registry.ts
+      jobs/job-cancellation.ts
+      preferences/preferences.ts
+      workspace/temp-workspace.ts
+  preload/
+    index.ts
+  shared/
+    constants/
+      channels.ts
+      config.ts
+    types/
+      api.ts
+      files.ts
+      ipc.ts
+      jobs.ts
+      preferences.ts
 ```
 
----
+## Where New Code Goes
 
-## Domain Examples
+- App lifecycle and BrowserWindow setup belong in `src/main/index.ts` unless the file becomes large enough to extract a focused helper.
+- IPC registration belongs in `src/main/ipc/index.ts`; each handler group lives in `src/main/ipc/<domain>.handler.ts`.
+- Privileged side effects belong in `src/main/services/<domain>/`.
+- Preload bridge code belongs in `src/preload/index.ts` until it is large enough to split by exposed namespace.
+- Cross-layer channels, result types, DTOs, and Zod schemas belong in `src/shared`.
 
-| Domain     | Description        | Example Procedures                          |
-| ---------- | ------------------ | ------------------------------------------- |
-| `project`  | Project management | `create`, `list`, `get`, `update`, `delete` |
-| `user`     | User management    | `get`, `update`, `updateSettings`           |
-| `auth`     | Authentication     | `login`, `logout`, `checkSession`           |
-| `settings` | App settings       | `get`, `save`, `reset`                      |
-| `file`     | File operations    | `read`, `write`, `list`, `delete`           |
+## Source Boundaries
 
----
+Main process code may use Electron and Node APIs. Renderer code should not.
 
-## Shared Types Directory
+The existing pattern is:
 
-```
-src/shared/
-├── constants/
-│   ├── channels.ts       # IPC channel names
-│   └── config.ts         # App configuration
-└── types/
-    ├── common.ts         # Shared utilities (e.g., createOutputSchema)
-    ├── project.ts        # Project-related types
-    └── user.ts           # User-related types
-```
+1. `src/shared/constants/channels.ts` defines a stable channel string.
+2. `src/main/ipc/<domain>.handler.ts` registers an `ipcMain.handle` callback.
+3. `src/preload/index.ts` exposes a typed method on `window.officeTools`.
+4. Renderer code calls `window.officeTools.<namespace>.<method>()`.
 
----
+## Generated Output
 
-## Test Directory Structure
+Do not use `.vite`, `out`, or `dist` as source. They are build artifacts and are ignored by lint/git.
 
-```
-tests/
-├── setup/
-│   ├── global-setup.ts        # Test database initialization
-│   └── test-helpers.ts        # Test utilities
-├── factories/                 # Test data factories
-│   ├── index.ts               # Barrel export + resetAllCounters()
-│   ├── user.factory.ts
-│   └── project.factory.ts
-├── mocks/
-│   └── electron.ts            # Electron API mocks
-├── unit/                      # Mock-based unit tests
-│   └── services/{domain}/
-│       ├── lib/*.test.ts      # Utility function tests
-│       └── procedures/*.test.ts
-└── integration/               # Real database tests
-    └── database/*.test.ts
-```
+## Current Non-Goals
 
----
-
-## Test File Naming Convention
-
-| Type             | Location                        | Naming                |
-| ---------------- | ------------------------------- | --------------------- |
-| Unit test        | `tests/unit/services/{domain}/` | `{file}.test.ts`      |
-| Integration test | `tests/integration/{category}/` | `{feature}.test.ts`   |
-| Factory          | `tests/factories/`              | `{entity}.factory.ts` |
-
----
-
-## Key Principles
-
-1. **One folder per domain** - Each business domain has its own folder
-2. **types.ts is required** - Every domain must have Zod schemas and types
-3. **procedures/ is required** - One file per action (create, get, list, etc.)
-4. **lib/ is optional** - Only add when you have reusable logic
-5. **IPC handlers are thin** - They only call procedures, no business logic
-
----
-
-## IPC Handler Example
-
-```typescript
-// src/main/ipc/project.handler.ts
-import { ipcMain } from 'electron';
-import { createProject } from '../services/project/procedures/create';
-import { listProjects } from '../services/project/procedures/list';
-import { IPC_CHANNELS } from '../../shared/constants/channels';
-
-export function setupProjectHandlers(): void {
-  ipcMain.handle(IPC_CHANNELS.PROJECT.CREATE, (_, input) => createProject(input));
-  ipcMain.handle(IPC_CHANNELS.PROJECT.LIST, (_, input) => listProjects(input));
-}
-```
-
----
-
-## When to Create a New Domain
-
-Create a new domain folder when:
-
-- You have a new business concept (e.g., "tasks", "notes", "settings")
-- You need multiple CRUD operations on an entity
-- The logic is distinct from existing domains
-
-Do NOT create a new domain for:
-
-- Single utility functions (put in existing domain's `lib/`)
-- Cross-cutting concerns (put in `services/` root, e.g., `logger.ts`)
+Do not add a persistent storage layer, list-query abstractions, HTTP routes, or server-style controllers unless a task explicitly introduces those layers and updates these specs.

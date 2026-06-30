@@ -1,88 +1,51 @@
-# Electron Development Guidelines
+# OfficeTools Trellis Specs
 
-Universal development guidelines extracted from production Electron projects.
+These specs describe the current OfficeTools repository. They are not a generic Electron template.
 
-## Structure
+## Current Architecture
 
-### [Frontend](./frontend/index.md)
+- Workspace: one pnpm workspace package, `@office-tools/desktop`.
+- Runtime: Electron main process, preload bridge, React renderer, and shared TypeScript contracts under `apps/desktop/src/shared`.
+- Build: Electron Forge 7 with the Vite plugin, Electron 33, Vite 6, React 18, TypeScript strict mode, Zod, and lucide-react.
+- Styling: plain global CSS split into token, base, layout, and component files.
+- Persistence: lightweight JSON preferences under Electron `userData`.
+- Not present today: persistent database layer, data-fetching framework, utility CSS framework, a test runner, and a separate shared package.
 
-React + TypeScript frontend development patterns:
-
-- [Directory Structure](./frontend/directory-structure.md)
-- [Components](./frontend/components.md)
-- [State Management](./frontend/state-management.md)
-- [Hooks](./frontend/hooks.md)
-- [IPC Communication](./frontend/ipc-electron.md)
-- [CSS Design](./frontend/css-design.md)
-- [Type Safety](./frontend/type-safety.md)
-- [React Pitfalls](./frontend/react-pitfalls.md)
-- [Electron Browser API Restrictions](./frontend/electron-browser-api-restrictions.md)
-
-### [Backend](./backend/index.md)
-
-Electron main process development patterns:
-
-- [Directory Structure](./backend/directory-structure.md)
-- [API Module](./backend/api-module.md)
-- [API Patterns](./backend/api-patterns.md)
-- [Database](./backend/database.md)
-- [Logging](./backend/logging.md)
-- [Error Handling](./backend/error-handling.md)
-- [Pagination](./backend/pagination.md)
-- [Environment](./backend/environment.md)
-- [Type Safety](./backend/type-safety.md)
-- [macOS Permissions](./backend/macos-permissions.md)
-- [Text Input](./backend/text-input.md)
+## Spec Layers
 
 ### [Shared](./shared/index.md)
 
-Cross-cutting concerns:
+Read these for every code change:
 
-- [TypeScript Conventions](./shared/typescript.md)
 - [Code Quality](./shared/code-quality.md)
+- [TypeScript](./shared/typescript.md)
 - [Git Conventions](./shared/git-conventions.md)
 - [Timestamp Handling](./shared/timestamp.md)
 - [pnpm + Electron Setup](./shared/pnpm-electron-setup.md)
 
-### [Guides](./guides/index.md)
+### [Backend / Main Process](./backend/index.md)
 
-Development thinking guides:
+Read these when changing `apps/desktop/src/main`, `apps/desktop/src/preload`, IPC channels, file-system access, preferences, or packaging behavior.
 
-- [Pre-Implementation Checklist](./guides/pre-implementation-checklist.md)
-- [Cross-Layer Thinking Guide](./guides/cross-layer-thinking-guide.md)
-- [Code Reuse Thinking Guide](./guides/code-reuse-thinking-guide.md)
-- [Bug Root Cause Thinking Guide](./guides/bug-root-cause-thinking-guide.md)
-- [DB Schema Change Guide](./guides/db-schema-change-guide.md)
-- [Transaction Consistency Guide](./guides/transaction-consistency-guide.md)
-- [Semantic Change Checklist](./guides/semantic-change-checklist.md)
+### [Frontend / Renderer](./frontend/index.md)
 
-### [Big Questions / Pitfalls](./big-question/index.md)
+Read these when changing `apps/desktop/src/renderer`, UI state, CSS, or renderer-to-main IPC calls.
 
-Common issues and solutions:
+### [Thinking Guides](./guides/index.md)
 
-- [Native Module Packaging](./big-question/native-module-packaging.md)
-- [Native Module Complex Dependencies](./big-question/native-module-complex-deps.md)
-- [IPC Handler Registration](./big-question/ipc-handler-registration.md)
-- [Network Stack Differences](./big-question/network-stack-differences.md)
-- [Transaction Silent Failure](./big-question/transaction-silent-failure.md)
-- [React useState Function](./big-question/react-usestate-function.md)
-- [CSS Flex Centering](./big-question/css-flex-centering.md)
-- [Timestamp Precision](./big-question/timestamp-precision.md)
-- [Bluetooth HID Device](./big-question/bluetooth-hid-device.md)
-- [Global Keyboard Hooks](./big-question/global-keyboard-hooks.md)
+Use these checklists before cross-layer work, repeated patterns, or non-trivial debugging. Database-specific guides only apply if a database layer is later introduced.
 
-## Tech Stack
+### [Big Questions](./big-question/index.md)
 
-- **Frontend**: React 18, TypeScript, TanStack Query, Tailwind CSS
-- **Backend**: Electron (Main Process), better-sqlite3, TypeScript
-- **IPC**: Type-safe contextBridge pattern
-- **Build**: Vite, electron-builder
+Project-specific pitfalls captured after debugging live here. Keep this layer small and source-backed.
 
-## Usage
+## Verification Commands
 
-These guidelines can be used as:
+Run from the repository root:
 
-1. **New Project Template** - Copy the entire structure for new Electron projects
-2. **Reference Documentation** - Consult specific guides when implementing features
-3. **Code Review Checklist** - Verify implementations against established patterns
-4. **Onboarding Material** - Help new developers understand project conventions
+```bash
+pnpm lint
+pnpm typecheck
+```
+
+These delegate to `@office-tools/desktop`.
