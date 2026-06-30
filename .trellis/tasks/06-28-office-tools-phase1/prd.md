@@ -18,7 +18,8 @@ Office users can process common Excel split and merge tasks on a local UOS ARM64
 - Target platform is UOS ARM64.
 - Delivery format is a `.deb` installer.
 - Phase 1 is local single-machine software with no login, licensing, cloud sync, or auto-update.
-- Only two tabs are visible in Phase 1: `Excel 拆分` and `Excel 合并`.
+- The Phase 1 shell uses a left module area that shows only `表格处理`; future modules such as `文档排版`, `图片转文字`, and `语音转文字` are hidden until implemented.
+- Inside `表格处理`, only two tabs are visible in Phase 1: `表格拆分` and `表格合并`.
 - Future modules are hidden until implemented.
 
 ## Task Map
@@ -107,7 +108,7 @@ The parent task owns cross-child requirements and final integration acceptance. 
 ## Acceptance Criteria
 
 - [ ] The task tree exists and each child has requirements tied to this parent PRD.
-- [ ] The final Phase 1 app shows only `Excel 拆分` and `Excel 合并`.
+- [ ] The final Phase 1 app shows the left `表格处理` module and only the `表格拆分` / `表格合并` tabs inside it.
 - [ ] The final app runs as a local UOS ARM64 Electron desktop app.
 - [ ] The final `.deb` can be installed and launched on the target platform.
 - [ ] Split and merge workflows enforce the file type, size, count, unsupported-object, encrypted-file, and macro-file rules.

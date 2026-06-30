@@ -33,7 +33,7 @@ export const SplitWorkflow = ({
 }: SplitWorkflowProps): JSX.Element => {
   return (
     <div className="workflow">
-      <section className="workflow-toolbar" aria-label="Excel 拆分操作">
+      <section className="workflow-toolbar" aria-label="表格拆分操作">
         <Button
           icon={<FileSpreadsheet size={17} aria-hidden="true" />}
           onClick={onSelectFiles}

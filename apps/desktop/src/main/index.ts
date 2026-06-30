@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
 import path from 'node:path';
 import './env-setup';
 import { APP_CONFIG } from '../shared/constants/config';
@@ -12,6 +12,7 @@ const createMainWindow = (): BrowserWindow => {
     height: APP_CONFIG.WINDOW.DEFAULT_HEIGHT,
     minWidth: APP_CONFIG.WINDOW.MIN_WIDTH,
     minHeight: APP_CONFIG.WINDOW.MIN_HEIGHT,
+    autoHideMenuBar: true,
     title: APP_CONFIG.PRODUCT_NAME,
     webPreferences: {
       preload: path.join(currentDirectory, 'preload.js'),
@@ -20,6 +21,8 @@ const createMainWindow = (): BrowserWindow => {
       sandbox: false,
     },
   });
+
+  mainWindow.setMenuBarVisibility(false);
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -33,6 +36,7 @@ const createMainWindow = (): BrowserWindow => {
 };
 
 const startApplication = (): void => {
+  Menu.setApplicationMenu(null);
   registerIpcHandlers();
   createMainWindow();
 };
