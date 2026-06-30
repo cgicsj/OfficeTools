@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { FileSpreadsheet, Layers, Table2 } from 'lucide-react';
+import { FileSpreadsheet, FileText, Image, Layers, Mic, Table2 } from 'lucide-react';
 import type { WorkflowTab } from '@shared/types/jobs';
 
 type AppShellProps = {
@@ -13,6 +13,13 @@ const tabs: Array<{ id: WorkflowTab; label: string; icon: ReactNode }> = [
   { id: 'merge', label: '表格合并', icon: <Layers size={18} aria-hidden="true" /> },
 ];
 
+const modules: Array<{ label: string; icon: ReactNode; isActive?: boolean }> = [
+  { label: '表格处理', icon: <Table2 size={18} aria-hidden="true" />, isActive: true },
+  { label: '文档排版', icon: <FileText size={18} aria-hidden="true" /> },
+  { label: '图片转文字', icon: <Image size={18} aria-hidden="true" /> },
+  { label: '语音转文字', icon: <Mic size={18} aria-hidden="true" /> },
+];
+
 export const AppShell = ({ activeTab, onTabChange, children }: AppShellProps): JSX.Element => {
   return (
     <div className="app-shell">
@@ -24,10 +31,19 @@ export const AppShell = ({ activeTab, onTabChange, children }: AppShellProps): J
           <h1>OfficeTools</h1>
         </div>
         <nav className="module-nav" aria-label="工具分类">
-          <button aria-current="page" className="module-nav__item module-nav__item--active" type="button">
-            <Table2 size={18} aria-hidden="true" />
-            <span>表格处理</span>
-          </button>
+          {modules.map((module) => (
+            <button
+              aria-current={module.isActive ? 'page' : undefined}
+              className={module.isActive ? 'module-nav__item module-nav__item--active' : 'module-nav__item'}
+              disabled={!module.isActive}
+              key={module.label}
+              title={module.label}
+              type="button"
+            >
+              {module.icon}
+              <span>{module.label}</span>
+            </button>
+          ))}
         </nav>
       </aside>
       <section className="app-content" aria-label="表格处理">
