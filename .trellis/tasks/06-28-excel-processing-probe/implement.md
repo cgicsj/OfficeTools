@@ -6,6 +6,7 @@
 - [x] Create a WPS detection probe.
 - [x] Create `.xls` conversion probe.
 - [x] Create `.et` direct library read probe.
+- [x] Create malformed `.et` rejection probe for SheetJS text fallback.
 - [x] Create workbook read/write probe for `.xlsx`.
 - [x] Create style preservation probe.
 - [x] Create merged-cell and hidden-row/column probe.
@@ -19,6 +20,7 @@
 - Run probes on the development machine.
 - Run WPS-specific `.xls` probes on UOS ARM64 when available.
 - Run direct `.et` library read probes with representative `.et` samples.
+- Confirm malformed `.et` files are rejected before generic text fallback.
 - Manually inspect generated files from preservation probes.
 
 ## Rollback

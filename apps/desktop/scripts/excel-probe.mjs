@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import * as nodeFs from 'node:fs';
 import { constants as fsConstants } from 'node:fs';
-import { access, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ExcelJS from 'exceljs';
@@ -464,8 +464,44 @@ const inspectObjectDetection = async (outputDirectory) => {
   };
 };
 
-const inspectSheetJsEtSample = (sample) => {
+const detectWorkbookContainer = async (inputPath) => {
+  const header = await readFile(inputPath);
+
+  if (
+    header[0] === 0xd0 &&
+    header[1] === 0xcf &&
+    header[2] === 0x11 &&
+    header[3] === 0xe0 &&
+    header[4] === 0xa1 &&
+    header[5] === 0xb1 &&
+    header[6] === 0x1a &&
+    header[7] === 0xe1
+  ) {
+    return 'cfb';
+  }
+
+  if (
+    header[0] === 0x50 &&
+    header[1] === 0x4b &&
+    ((header[2] === 0x03 && header[3] === 0x04) ||
+      (header[2] === 0x05 && header[3] === 0x06) ||
+      (header[2] === 0x07 && header[3] === 0x08))
+  ) {
+    return 'zip';
+  }
+
+  return 'unknown';
+};
+
+const inspectSheetJsEtSample = async (sample) => {
+  let containerType = 'unread';
+
   try {
+    containerType = await detectWorkbookContainer(sample.path);
+    if (containerType === 'unknown') {
+      throw new Error('Unsupported .et container signature; expected a CFB or ZIP workbook container.');
+    }
+
     const workbook = XLSX.readFile(sample.path, {
       cellDates: true,
       cellNF: true,
@@ -489,6 +525,7 @@ const inspectSheetJsEtSample = (sample) => {
     return {
       name: sample.name,
       status: 'pass',
+      containerType,
       sheetNames: workbook.SheetNames,
       firstSheetName,
       rowCount: rows.length,
@@ -506,6 +543,7 @@ const inspectSheetJsEtSample = (sample) => {
     return {
       name: sample.name,
       status: 'fail',
+      containerType,
       sheetNames: [],
       firstSheetName: '',
       rowCount: 0,
@@ -532,13 +570,31 @@ const inspectSheetJsEtRead = async (samples) => {
     };
   }
 
-  const reads = etSamples.map((sample) => inspectSheetJsEtSample(sample));
+  const reads = await Promise.all(etSamples.map((sample) => inspectSheetJsEtSample(sample)));
 
   return {
     status: reads.every((read) => read.status === 'pass') ? 'tested' : 'failed',
     reason: 'SheetJS direct .et read attempts completed.',
     etSamples,
     reads,
+  };
+};
+
+const inspectMalformedEtRejection = async (outputDirectory) => {
+  const malformedEtPath = path.join(outputDirectory, 'malformed-direct-read.et');
+  await writeFile(malformedEtPath, 'not a WPS ET workbook', 'utf8');
+
+  const read = await inspectSheetJsEtSample({
+    name: path.basename(malformedEtPath),
+    path: malformedEtPath,
+    extension: '.et',
+    sizeBytes: Buffer.byteLength('not a WPS ET workbook'),
+  });
+
+  return {
+    malformedEtPath,
+    read,
+    passed: read.status === 'fail' && read.containerType === 'unknown',
   };
 };
 
@@ -646,6 +702,7 @@ const buildReport = ({
   excelJsProbe,
   objectDetectionProbe,
   sheetJsEtProbe,
+  malformedEtProbe,
   wpsConversionProbe,
 }) => {
   const excelRows = excelJsProbe.checks.map((check) => [
@@ -685,6 +742,7 @@ const buildReport = ({
   const etReadRows = sheetJsEtProbe.reads.map((read) => [
     read.name,
     read.status,
+    read.containerType,
     read.sheetNames.join(', ') || '-',
     read.firstSheetName || '-',
     String(read.rowCount),
@@ -721,6 +779,7 @@ Keep \`.xls\` support gated behind WPS conversion. This development machine did 
 - [x] Probe report documents WPS command availability and conversion behavior.
 - [${wpsConversionProbe.status === 'tested' ? 'x' : ' '}] \`.xls\` conversion tested with a sample file.
 - [${sheetJsEtProbe.status === 'tested' ? 'x' : ' '}] \`.et\` direct library read tested with a sample file.
+- [${malformedEtProbe.passed ? 'x' : ' '}] Malformed \`.et\` input is rejected before SheetJS text fallback can treat it as a sheet.
 - [x] Candidate Excel library tested against preservation requirements.
 - [x] Selected-sheet embedded object detection approach documented.
 - [x] Formula display-value limitations documented.
@@ -747,7 +806,13 @@ ${conversionRows.length > 0 ? markdownTable(['Input', 'Args', 'Exit', 'Output ex
 - Status: \`${sheetJsEtProbe.status}\`
 - Reason: ${sheetJsEtProbe.reason}
 
-${etReadRows.length > 0 ? markdownTable(['File', 'Result', 'Sheets', 'First sheet', 'Rows', 'Columns', 'Merges', 'Formatted cells', 'Style cells', 'Error'], etReadRows) : 'No .et direct-read attempt was executed in this run.'}
+${etReadRows.length > 0 ? markdownTable(['File', 'Result', 'Container', 'Sheets', 'First sheet', 'Rows', 'Columns', 'Merges', 'Formatted cells', 'Style cells', 'Error'], etReadRows) : 'No .et direct-read attempt was executed in this run.'}
+
+### Malformed ET Rejection
+
+- Artifact: \`${path.relative(repoRoot, malformedEtProbe.malformedEtPath)}\`
+- Result: \`${malformedEtProbe.passed ? 'pass' : 'fail'}\`
+- Detail: ${malformedEtProbe.read.error || 'Malformed input was unexpectedly accepted.'}
 
 ## ExcelJS Workbook Probe
 
@@ -795,6 +860,7 @@ const main = async () => {
   const excelJsProbe = await inspectExcelJsRoundTrip(options.outputDirectory);
   const objectDetectionProbe = await inspectObjectDetection(options.outputDirectory);
   const sheetJsEtProbe = await inspectSheetJsEtRead(samples);
+  const malformedEtProbe = await inspectMalformedEtRejection(options.outputDirectory);
   const wpsConversionProbe = await runWpsConversionProbes({
     detectedCommands,
     samples,
@@ -809,6 +875,7 @@ const main = async () => {
     excelJsProbe,
     objectDetectionProbe,
     sheetJsEtProbe,
+    malformedEtProbe,
     wpsConversionProbe,
   });
   await writeFile(options.reportPath, report, 'utf8');
@@ -816,7 +883,12 @@ const main = async () => {
   process.stdout.write(`Excel probe report written to ${options.reportPath}\n`);
 
   const failedChecks = excelJsProbe.checks.filter((check) => !check.passed);
-  if (failedChecks.length > 0 || !objectDetectionProbe.passed || sheetJsEtProbe.status === 'failed') {
+  if (
+    failedChecks.length > 0 ||
+    !objectDetectionProbe.passed ||
+    sheetJsEtProbe.status === 'failed' ||
+    !malformedEtProbe.passed
+  ) {
     process.stderr.write('One or more probe checks failed. Review the report for details.\n');
     process.exitCode = 1;
   }

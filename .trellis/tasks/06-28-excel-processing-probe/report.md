@@ -24,6 +24,7 @@ Keep `.xls` support gated behind WPS conversion. This development machine did no
 - [x] Probe report documents WPS command availability and conversion behavior.
 - [ ] `.xls` conversion tested with a sample file.
 - [ ] `.et` direct library read tested with a sample file.
+- [x] Malformed `.et` input is rejected before SheetJS text fallback can treat it as a sheet.
 - [x] Candidate Excel library tested against preservation requirements.
 - [x] Selected-sheet embedded object detection approach documented.
 - [x] Formula display-value limitations documented.
@@ -51,6 +52,12 @@ No conversion command was executed in this run.
 - Reason: No .et sample files were found. Add representative .et samples and rerun the probe.
 
 No .et direct-read attempt was executed in this run.
+
+### Malformed ET Rejection
+
+- Artifact: `.trellis/tasks/06-28-excel-processing-probe/probe-output/malformed-direct-read.et`
+- Result: `pass`
+- Detail: Unsupported .et container signature; expected a CFB or ZIP workbook container.
 
 ## ExcelJS Workbook Probe
 

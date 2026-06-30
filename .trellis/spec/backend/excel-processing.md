@@ -59,6 +59,7 @@ The exact type names may evolve, but the responsibilities should stay separate.
 - `.xlsx` files may go directly into the workbook adapter.
 - `.xls` files must first pass through WPS conversion into a temp `.xlsx` file.
 - `.et` files must go through the direct `.et` reader adapter; do not convert `.et` through WPS.
+- The `.et` reader must preflight the file container signature and reject unknown/text-like files before accepting a SheetJS result. SheetJS may parse arbitrary text as a single-sheet workbook.
 - Output files are always `.xlsx`.
 - Temporary `.xls` conversion and processing files belong under a per-job temp workspace and must be cleaned after success, failure, or cancellation.
 - Formula output uses cached calculated results. If a formula cell has no cached result, the feature must warn/skip rather than pretending it has a calculated display value.
@@ -76,6 +77,7 @@ Environment/config contract:
 | WPS command not found for `.xls` | Return a typed failure that tells the user to manually convert to `.xlsx`; batch jobs skip the current file and continue. |
 | WPS `.xls` conversion exits without an `.xlsx` output | Treat as conversion failure; delete partial temp files. |
 | Direct `.et` reader cannot open workbook | Return a typed failure that tells the user to manually convert to `.xlsx`; batch jobs skip the current file and continue. |
+| `.et` file has an unknown/text-like container signature | Reject before SheetJS generic text fallback; tell the user to manually convert to `.xlsx`. |
 | Direct `.et` reader lacks required metadata in validation samples | Narrow the `.et` support contract before split/merge implementation proceeds. |
 | `exceljs` cannot open workbook | Mark file failed/skipped with a user-facing log. |
 | Selected sheet has drawing/vml/ole/control relationship | Block that file as unsupported. |
@@ -90,6 +92,7 @@ Environment/config contract:
 - Base: `.xlsx` with no embedded object relationships on the selected sheet processes normally.
 - Bad: selected worksheet `.rels` contains a drawing relationship; the file is blocked before output generation.
 - Good: representative `.et` samples expose sheet names, display rows, merge metadata, format metadata, and hidden row/column metadata through the direct reader.
+- Bad: a text file renamed to `.et` is rejected by container preflight instead of being accepted as a one-cell SheetJS workbook.
 - Bad: `.xls` is selected on a machine without WPS; the app asks the user to manually convert and skips that file.
 - Bad: `.et` direct reading fails; the app asks the user to manually convert to `.xlsx` and skips that file.
 
@@ -117,6 +120,7 @@ Assertions to preserve in automated or manual checks:
 - selected-sheet object relationship blocks the file;
 - WPS conversion produces a real `.xlsx` output for `.xls`, or the fallback is documented before split/merge implementation proceeds.
 - SheetJS direct reading opens representative `.et` samples and exposes required metadata, or the `.et` support contract is narrowed before split/merge implementation proceeds.
+- Malformed/text-like `.et` inputs are rejected before SheetJS generic text fallback can turn them into single-sheet workbooks.
 
 ### 7. Wrong vs Correct
 
@@ -129,6 +133,9 @@ await window.someFileApi.read('/home/user/source.xls');
 // ET is routed through WPS conversion even though the plan requires direct reading.
 await wpsConverter.convertXlsToXlsx('/home/user/source.et', tempDir);
 
+// A SheetJS read result is accepted without checking whether the input was a workbook container.
+const workbook = await etWorkbookReader.openEtWorkbook('/home/user/not-really.et');
+
 // Formula without cached result is treated as a display value.
 outputCell.value = formulaCell.value.formula;
 ```
@@ -139,7 +146,7 @@ outputCell.value = formulaCell.value.formula;
 // Renderer stores sourceId; main process resolves the real path and runs adapters.
 const sourcePath = getRegisteredFilePath(sourceId);
 const workbook = sourcePath.endsWith('.et')
-  ? await etWorkbookReader.openEtWorkbook(sourcePath)
+  ? await etWorkbookReader.openEtWorkbookAfterContainerPreflight(sourcePath)
   : await workbookAdapter.openWorkbook(sourcePath);
 
 // Formula cells use saved calculated results only.
