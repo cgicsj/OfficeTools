@@ -48,6 +48,25 @@ pnpm lint
 
 ---
 
+## Generated Output Ignores
+
+Electron Forge and Vite may create generated bundles in nested directories, such as
+`src/renderer/.vite/renderer/main_window/assets`. ESLint must ignore generated
+output recursively so lint only checks source files.
+
+```javascript
+// Good - catches nested generated directories from Electron/Vite
+ignores: ['**/dist/**', '**/out/**', '**/.vite/**', '**/node_modules/**'];
+
+// Bad - only ignores directories at the config base and can miss nested output
+ignores: ['dist', 'out', '.vite'];
+```
+
+**Validation**: After any build/dev run that creates output, `pnpm lint` must still
+pass without scanning generated bundles.
+
+---
+
 ## Forbidden Patterns
 
 | Pattern                             | Reason             | Fix                                 |
