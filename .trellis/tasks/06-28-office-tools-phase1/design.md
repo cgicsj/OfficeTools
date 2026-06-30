@@ -37,7 +37,16 @@ Excel processing should be implemented behind an adapter boundary:
 - `FilenamePolicy`: sanitize illegal path characters, enforce length limits, and resolve duplicate names.
 - `TempWorkspace`: create and clean per-job cache directories.
 
-The actual Excel library choice is intentionally gated by `06-28-excel-processing-probe`. Feature implementation should not assume a library until the probe validates style preservation, merged cells, hidden rows/columns, number formats, display values, and selected-sheet object detection.
+The initial probe result selects `exceljs` as the first `.xlsx` workbook adapter candidate and `yauzl` relationship inspection for selected-sheet embedded-object detection. Feature implementation may build behind these adapter boundaries, but automatic `.xls` and `.et` conversion remains gated by a UOS ARM64 WPS run with representative samples. Formula output should use cached calculated results; files without saved formula results need an explicit warning/skip path.
+
+## Probe Findings
+
+Local probe findings recorded in `06-28-excel-processing-probe/report.md`:
+
+- Use `exceljs` for Phase 1 `.xlsx` read/write adapter work.
+- Use `yauzl` to inspect worksheet relationship files for selected-sheet embedded object detection.
+- Preserve formulas as display values only when cached formula results are present.
+- Keep WPS `.xls` / `.et` conversion behind a target-machine validation gate; the current development environment did not have WPS installed.
 
 ## UI State Design
 

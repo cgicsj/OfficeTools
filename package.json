@@ -13,7 +13,7 @@
     "build": "pnpm --filter @office-tools/desktop build",
     "make": "pnpm --filter @office-tools/desktop make",
     "lint": "pnpm --filter @office-tools/desktop lint",
-    "typecheck": "pnpm --filter @office-tools/desktop typecheck"
+    "typecheck": "pnpm --filter @office-tools/desktop typecheck",
+    "probe:excel": "pnpm --filter @office-tools/desktop probe:excel"
   }
 }
-

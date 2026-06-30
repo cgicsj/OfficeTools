@@ -45,3 +45,14 @@ Write a short report in the task directory summarizing:
 - gaps;
 - chosen implementation path;
 - changes needed in parent/child PRDs.
+
+## Local Probe Findings
+
+The probe harness uses `exceljs` for `.xlsx` workbook read/write checks and `yauzl` for read-only inspection of worksheet relationship files inside `.xlsx` archives.
+
+Local findings from the development machine:
+
+- `exceljs` can read workbook/sheet names and preserve styles, column widths, row heights, merged cells, hidden row/column state, number/date formats, long-number text formatting, and saved formula results when explicit copy logic is used.
+- Formulas without cached results do not expose a trustworthy calculated display value; production behavior should use saved results and warn or skip when no cached result is available.
+- Embedded-object detection can be implemented by checking `xl/worksheets/_rels/sheetN.xml.rels` for drawing, vmlDrawing, oleObject, or ctrlProp relationship types. Synthetic image detection worked per worksheet.
+- No WPS command was detected on the development machine, so `.xls` and `.et` conversion remains a UOS ARM64 target validation gate.

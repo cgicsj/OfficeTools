@@ -18,6 +18,7 @@ There is no database, ORM, HTTP server, or logging framework in the current code
 | [directory-structure.md](./directory-structure.md) | Adding main, preload, service, or IPC files |
 | [ipc-handlers.md](./ipc-handlers.md) | Adding or changing IPC channels and preload APIs |
 | [services.md](./services.md) | File selection, preferences, temp workspace, job services |
+| [excel-processing.md](./excel-processing.md) | Excel adapters, WPS conversion gate, object detection |
 | [environment.md](./environment.md) | App startup, `userData`, build, package, or generated files |
 | [error-handling.md](./error-handling.md) | IPC result shapes and expected failures |
 | [type-safety.md](./type-safety.md) | Zod schemas, `ApiResult`, shared constants |
@@ -36,6 +37,7 @@ Always also read `../shared/index.md`.
 | Keep real filesystem paths in main-process registries | [services.md](./services.md) |
 | Import `env-setup` before code that depends on `userData` | [environment.md](./environment.md) |
 | Do not introduce persistent storage patterns without a new design | [directory-structure.md](./directory-structure.md) |
+| Keep Excel processing behind main-process adapters | [excel-processing.md](./excel-processing.md) |
 
 ## Reference Source Files
 
