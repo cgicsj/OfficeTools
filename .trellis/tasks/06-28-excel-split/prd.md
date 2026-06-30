@@ -18,8 +18,9 @@ Depends on:
 - Reject files over 10 MB.
 - Require the user to click `解析文档`.
 - Process files one by one with per-file interaction.
-- Convert `.xls` and `.et` through WPS before parsing.
-- If WPS is unavailable or conversion fails, show the manual-conversion dialog, skip the file, and continue.
+- Convert `.xls` through WPS before parsing.
+- Parse `.et` through the direct `.et` library adapter without WPS conversion.
+- If `.xls` WPS conversion fails or `.et` direct reading fails, show the manual-conversion dialog, skip the file, and continue.
 - Let the user select a sheet per file, defaulting to the first sheet.
 - Reject the current file if the selected sheet contains images, charts, legends, or similar embedded visual objects.
 - Let the user select the field-name row.

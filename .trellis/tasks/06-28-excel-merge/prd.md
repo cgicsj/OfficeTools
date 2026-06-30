@@ -17,8 +17,9 @@ Depends on:
 - Traverse the selected folder and keep `.xls`, `.xlsx`, and `.et` files.
 - Exclude files over 10 MB.
 - List eligible files with numeric prefixes.
-- Convert `.xls` and `.et` through WPS before parsing.
-- If WPS is unavailable or conversion fails, show the manual-conversion dialog, skip the file, and continue.
+- Convert `.xls` through WPS before parsing.
+- Parse `.et` through the direct `.et` library adapter without WPS conversion.
+- If `.xls` WPS conversion fails or `.et` direct reading fails, show the manual-conversion dialog, skip the file, and continue.
 - Let the user select one sheet for each eligible file.
 - Reject a file if its selected sheet contains images, charts, legends, or similar embedded visual objects.
 - Support merge mode 1: merge selected sheets into one output sheet.

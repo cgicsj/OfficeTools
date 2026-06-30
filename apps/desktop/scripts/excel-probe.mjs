@@ -1,12 +1,18 @@
 #!/usr/bin/env node
 /* global Buffer, process */
 import { spawnSync } from 'node:child_process';
+import * as nodeFs from 'node:fs';
 import { constants as fsConstants } from 'node:fs';
 import { access, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
+import * as cpexcel from 'xlsx/dist/cpexcel.full.mjs';
 import yauzl from 'yauzl';
+
+XLSX.set_fs(nodeFs);
+XLSX.set_cptable(cpexcel);
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const desktopRoot = path.resolve(scriptDirectory, '..');
@@ -458,6 +464,84 @@ const inspectObjectDetection = async (outputDirectory) => {
   };
 };
 
+const inspectSheetJsEtSample = (sample) => {
+  try {
+    const workbook = XLSX.readFile(sample.path, {
+      cellDates: true,
+      cellNF: true,
+      cellStyles: true,
+      cellText: true,
+    });
+    const firstSheetName = workbook.SheetNames[0];
+    const firstWorksheet = firstSheetName ? workbook.Sheets[firstSheetName] : undefined;
+
+    if (!firstWorksheet) {
+      throw new Error('No readable worksheets were found.');
+    }
+
+    const rows = XLSX.utils.sheet_to_json(firstWorksheet, {
+      header: 1,
+      raw: false,
+      defval: '',
+    });
+    const cellAddresses = Object.keys(firstWorksheet).filter((key) => /^[A-Z]+[0-9]+$/.test(key));
+
+    return {
+      name: sample.name,
+      status: 'pass',
+      sheetNames: workbook.SheetNames,
+      firstSheetName,
+      rowCount: rows.length,
+      columnCount: rows.reduce((maxColumnCount, row) => (
+        Array.isArray(row) ? Math.max(maxColumnCount, row.length) : maxColumnCount
+      ), 0),
+      mergeCount: firstWorksheet['!merges']?.length ?? 0,
+      rowMetadataCount: firstWorksheet['!rows']?.length ?? 0,
+      columnMetadataCount: firstWorksheet['!cols']?.length ?? 0,
+      formattedCellCount: cellAddresses.filter((address) => firstWorksheet[address]?.z || firstWorksheet[address]?.w).length,
+      styleCellCount: cellAddresses.filter((address) => firstWorksheet[address]?.s).length,
+      error: '',
+    };
+  } catch (error) {
+    return {
+      name: sample.name,
+      status: 'fail',
+      sheetNames: [],
+      firstSheetName: '',
+      rowCount: 0,
+      columnCount: 0,
+      mergeCount: 0,
+      rowMetadataCount: 0,
+      columnMetadataCount: 0,
+      formattedCellCount: 0,
+      styleCellCount: 0,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+};
+
+const inspectSheetJsEtRead = async (samples) => {
+  const etSamples = samples.filter((sample) => sample.extension === '.et');
+
+  if (etSamples.length === 0) {
+    return {
+      status: 'skipped',
+      reason: 'No .et sample files were found. Add representative .et samples and rerun the probe.',
+      etSamples,
+      reads: [],
+    };
+  }
+
+  const reads = etSamples.map((sample) => inspectSheetJsEtSample(sample));
+
+  return {
+    status: reads.every((read) => read.status === 'pass') ? 'tested' : 'failed',
+    reason: 'SheetJS direct .et read attempts completed.',
+    etSamples,
+    reads,
+  };
+};
+
 const attemptWpsConversion = async ({ commandPath, inputPath, outputDirectory }) => {
   const attempts = [
     ['--headless', '--convert-to', 'xlsx', '--outdir', outputDirectory, inputPath],
@@ -499,15 +583,13 @@ const attemptWpsConversion = async ({ commandPath, inputPath, outputDirectory })
 
 const runWpsConversionProbes = async ({ detectedCommands, samples, outputDirectory, runWpsConversion }) => {
   const xlsSamples = samples.filter((sample) => sample.extension === '.xls');
-  const etSamples = samples.filter((sample) => sample.extension === '.et');
   const commandPath = detectedCommands[0]?.resolvedPath;
 
   if (!runWpsConversion) {
     return {
       status: 'skipped',
-      reason: 'Pass --run-wps-conversion on a UOS ARM64 machine with WPS and sample .xls/.et files to attempt conversion.',
+      reason: 'Pass --run-wps-conversion on a UOS ARM64 machine with WPS and sample .xls files to attempt conversion.',
       xlsSamples,
-      etSamples,
       attempts: [],
     };
   }
@@ -517,18 +599,16 @@ const runWpsConversionProbes = async ({ detectedCommands, samples, outputDirecto
       status: 'blocked',
       reason: 'No WPS command was detected.',
       xlsSamples,
-      etSamples,
       attempts: [],
     };
   }
 
-  const conversionSamples = [...xlsSamples.slice(0, 1), ...etSamples.slice(0, 1)];
+  const conversionSamples = xlsSamples.slice(0, 1);
   if (conversionSamples.length === 0) {
     return {
       status: 'blocked',
-      reason: 'No .xls or .et sample files were found.',
+      reason: 'No .xls sample files were found.',
       xlsSamples,
-      etSamples,
       attempts: [],
     };
   }
@@ -546,7 +626,6 @@ const runWpsConversionProbes = async ({ detectedCommands, samples, outputDirecto
     status: attempts.some((attempt) => attempt.results.some((result) => result.outputExists)) ? 'tested' : 'failed',
     reason: 'WPS conversion command attempts completed.',
     xlsSamples,
-    etSamples,
     attempts,
   };
 };
@@ -560,7 +639,15 @@ const markdownTable = (headers, rows) => {
   return [headerLine, dividerLine, ...rowLines].join('\n');
 };
 
-const buildReport = ({ options, detectedCommands, samples, excelJsProbe, objectDetectionProbe, wpsConversionProbe }) => {
+const buildReport = ({
+  options,
+  detectedCommands,
+  samples,
+  excelJsProbe,
+  objectDetectionProbe,
+  sheetJsEtProbe,
+  wpsConversionProbe,
+}) => {
   const excelRows = excelJsProbe.checks.map((check) => [
     check.name,
     check.passed ? 'pass' : 'fail',
@@ -595,9 +682,18 @@ const buildReport = ({ options, detectedCommands, samples, excelJsProbe, objectD
     (result.stderr || result.stdout || '-').replace(/\|/g, '\\|').replace(/\n/g, '<br>'),
   ]));
 
-  const etConversionDocumented = wpsConversionProbe.status === 'tested' ||
-    wpsConversionProbe.status === 'skipped' ||
-    wpsConversionProbe.status === 'blocked';
+  const etReadRows = sheetJsEtProbe.reads.map((read) => [
+    read.name,
+    read.status,
+    read.sheetNames.join(', ') || '-',
+    read.firstSheetName || '-',
+    String(read.rowCount),
+    String(read.columnCount),
+    String(read.mergeCount),
+    String(read.formattedCellCount),
+    String(read.styleCellCount),
+    read.error.replace(/\|/g, '\\|').replace(/\n/g, '<br>') || '-',
+  ]);
 
   return `# Excel Processing Capability Probe Report
 
@@ -607,25 +703,28 @@ const buildReport = ({ options, detectedCommands, samples, excelJsProbe, objectD
 - Generated output directory: \`${path.relative(repoRoot, options.outputDirectory)}\`
 - Sample directory: \`${path.relative(repoRoot, options.sampleDirectory)}\`
 - Candidate workbook library: \`exceljs\`
+- Candidate .et reader: \`xlsx\` / SheetJS CE
 - Candidate xlsx relationship inspector: \`yauzl\`
 
 ## Recommendation
 
 Use \`exceljs\` as the first Phase 1 \`.xlsx\` workbook adapter candidate. The synthetic round trip confirms workbook/sheet reading, writing, styles, widths, row heights, merge ranges, hidden rows/columns, number formats, and saved formula results can be preserved with explicit copy logic.
 
+Use SheetJS CE \`xlsx\` as the direct-read adapter candidate for WPS \`.et\` files. Do not route \`.et\` through WPS conversion. Real \`.et\` samples must still validate sheet names, display values, merge metadata, format metadata, hidden row/column metadata, and any required style preservation limits before split/merge implementation treats \`.et\` as fully supported.
+
 Use a ZIP relationship inspection step for selected-sheet embedded object detection. The synthetic image workbook confirms worksheet-level drawing relationships can be detected without opening the workbook in the renderer. Validate this again with real chart/image/WPS-authored samples before split/merge implementation.
 
-Keep \`.xls\` and \`.et\` support gated behind WPS conversion. This development machine did not prove UOS ARM64 WPS conversion unless the WPS conversion section below says \`tested\`; run the same script on the target machine with \`--run-wps-conversion\` and sample files before starting split/merge.
+Keep \`.xls\` support gated behind WPS conversion. This development machine did not prove UOS ARM64 WPS \`.xls\` conversion unless the WPS conversion section below says \`tested\`; run the same script on the target machine with \`--run-wps-conversion\` and sample \`.xls\` files before starting split/merge.
 
 ## Acceptance Matrix
 
 - [x] Probe report documents WPS command availability and conversion behavior.
 - [${wpsConversionProbe.status === 'tested' ? 'x' : ' '}] \`.xls\` conversion tested with a sample file.
-- [${etConversionDocumented ? 'x' : ' '}] \`.et\` conversion tested with a sample file or documented as blocked by local WPS availability.
+- [${sheetJsEtProbe.status === 'tested' ? 'x' : ' '}] \`.et\` direct library read tested with a sample file.
 - [x] Candidate Excel library tested against preservation requirements.
 - [x] Selected-sheet embedded object detection approach documented.
 - [x] Formula display-value limitations documented.
-- [x] Parent design updated with local probe findings and target-machine WPS gate.
+- [x] Parent design updated with local probe findings, direct \`.et\` reader plan, and target-machine \`.xls\` WPS gate.
 
 ## Samples
 
@@ -642,6 +741,13 @@ ${wpsRows.length > 0 ? markdownTable(['Candidate', 'Resolved path', 'Help exit',
 - Run flag used: \`${String(options.runWpsConversion)}\`
 
 ${conversionRows.length > 0 ? markdownTable(['Input', 'Args', 'Exit', 'Output exists', 'Output excerpt'], conversionRows) : 'No conversion command was executed in this run.'}
+
+## SheetJS ET Direct-Read Probe
+
+- Status: \`${sheetJsEtProbe.status}\`
+- Reason: ${sheetJsEtProbe.reason}
+
+${etReadRows.length > 0 ? markdownTable(['File', 'Result', 'Sheets', 'First sheet', 'Rows', 'Columns', 'Merges', 'Formatted cells', 'Style cells', 'Error'], etReadRows) : 'No .et direct-read attempt was executed in this run.'}
 
 ## ExcelJS Workbook Probe
 
@@ -671,9 +777,10 @@ Detection approach: inspect \`xl/worksheets/_rels/sheetN.xml.rels\` for relation
 ## Next Steps Before Split/Merge
 
 1. Add representative \`.xls\`, \`.et\`, styled \`.xlsx\`, and object-containing \`.xlsx\` samples under \`${path.relative(repoRoot, options.sampleDirectory)}\` on a UOS ARM64 machine.
-2. Run \`pnpm probe:excel -- --run-wps-conversion\` from the repository root.
-3. If WPS conversion fails, revise split/merge PRDs to use manual conversion for \`.xls\` and \`.et\`.
-4. If real embedded object samples are not detected per selected sheet, conservatively block workbooks with any worksheet object relationship and update the parent design.
+2. Run \`pnpm probe:excel -- --run-wps-conversion\` from the repository root to validate WPS \`.xls\` conversion and SheetJS \`.et\` direct reading in the same report.
+3. If WPS \`.xls\` conversion fails, revise split/merge PRDs to use manual conversion for \`.xls\`.
+4. If SheetJS \`.et\` direct reading fails or cannot preserve required metadata from real samples, narrow the \`.et\` support contract before split/merge implementation starts.
+5. If real embedded object samples are not detected per selected sheet, conservatively block workbooks with any worksheet object relationship and update the parent design.
 `;
 };
 
@@ -687,6 +794,7 @@ const main = async () => {
   const samples = await findSamples(options.sampleDirectory);
   const excelJsProbe = await inspectExcelJsRoundTrip(options.outputDirectory);
   const objectDetectionProbe = await inspectObjectDetection(options.outputDirectory);
+  const sheetJsEtProbe = await inspectSheetJsEtRead(samples);
   const wpsConversionProbe = await runWpsConversionProbes({
     detectedCommands,
     samples,
@@ -700,6 +808,7 @@ const main = async () => {
     samples,
     excelJsProbe,
     objectDetectionProbe,
+    sheetJsEtProbe,
     wpsConversionProbe,
   });
   await writeFile(options.reportPath, report, 'utf8');
@@ -707,7 +816,7 @@ const main = async () => {
   process.stdout.write(`Excel probe report written to ${options.reportPath}\n`);
 
   const failedChecks = excelJsProbe.checks.filter((check) => !check.passed);
-  if (failedChecks.length > 0 || !objectDetectionProbe.passed) {
+  if (failedChecks.length > 0 || !objectDetectionProbe.passed || sheetJsEtProbe.status === 'failed') {
     process.stderr.write('One or more probe checks failed. Review the report for details.\n');
     process.exitCode = 1;
   }

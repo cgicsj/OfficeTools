@@ -21,7 +21,8 @@ Do not start the parent task for implementation unless parent-only integration w
 - [ ] Scaffold the Electron + React + TypeScript application.
 - [ ] Define IPC contracts and shared job/log types.
 - [ ] Implement app shell, two tabs, independent logs, file list states, progress, and cancellation plumbing.
-- [ ] Validate WPS conversion on UOS ARM64 for `.xls` and `.et`.
+- [ ] Validate WPS conversion on UOS ARM64 for `.xls`.
+- [ ] Validate direct `.et` library reading with representative `.et` samples.
 - [ ] Validate Excel adapter capabilities for style, merged cells, hidden rows/columns, number formats, display values, and object detection.
 - [ ] Implement split parsing and per-file configuration flow.
 - [ ] Implement split output generation and final zip structure.
@@ -64,6 +65,7 @@ Maintain sample files for:
 
 ## Rollback Points
 
-- If WPS conversion is unreliable, narrow `.xls` and `.et` to manual-conversion-only before implementing feature UI around automatic conversion.
+- If WPS conversion is unreliable, narrow `.xls` to manual-conversion-only before implementing feature UI around automatic conversion.
+- If direct `.et` reading cannot meet required metadata and formatting needs, narrow `.et` to manual `.xlsx` conversion before implementing feature UI around `.et` support.
 - If selected-sheet object detection is not reliable, block workbooks with any embedded workbook objects and revise the PRD before implementation.
 - If style preservation cannot meet manual acceptance, document the exact unsupported style subset and get product approval before continuing.

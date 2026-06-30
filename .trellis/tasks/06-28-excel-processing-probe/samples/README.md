@@ -18,4 +18,4 @@ Run from the repository root:
 pnpm probe:excel -- --run-wps-conversion
 ```
 
-Generated probe workbooks are written to `../probe-output/`, which is ignored.
+The flag attempts WPS `.xls` conversion when WPS is installed. SheetJS `.et` direct-read validation runs whenever `.et` samples are present. Generated probe workbooks are written to `../probe-output/`, which is ignored.

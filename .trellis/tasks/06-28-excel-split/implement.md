@@ -24,7 +24,7 @@
 - Split merged-title `.xlsx`.
 - Split styled/date/long-number `.xlsx`.
 - Split `.xls` through WPS conversion.
-- Split `.et` through WPS conversion.
+- Split `.et` through the direct `.et` library adapter.
 - Verify selected-sheet object rejection.
 - Verify cancel cleanup.
 
