@@ -8,10 +8,9 @@ Parent task: `06-28-office-tools-phase1`.
 
 ## Requirements
 
-- Verify how OfficeTools can call locally installed WPS on UOS ARM64 for `.xls` conversion.
-- Verify `.xls` to `.xlsx` conversion.
+- Verify direct `.xls` reading through a library that supports legacy Excel `.xls` files.
 - Verify direct `.et` reading through a library that supports WPS `.et` files.
-- Verify behavior when WPS is unavailable, `.xls` conversion fails, or direct `.et` reading fails.
+- Verify behavior when direct `.xls` or `.et` reading fails.
 - Evaluate Excel library support for:
   - reading sheet names and row counts;
   - reading display values;
@@ -27,9 +26,9 @@ Parent task: `06-28-office-tools-phase1`.
 
 ## Acceptance Criteria
 
-- [x] A probe report documents WPS command availability and `.xls` conversion behavior.
-- [ ] `.xls` conversion has been tested with a sample file.
+- [ ] `.xls` direct library reading has been tested with a sample file.
 - [ ] `.et` direct library reading has been tested with a sample file.
+- [x] Malformed `.xls` input is rejected before SheetJS text fallback can treat it as a valid sheet.
 - [x] Malformed `.et` input is rejected before SheetJS text fallback can treat it as a valid sheet.
 - [x] The direct `.et` library choice and validation gaps are documented.
 - [x] At least one candidate Excel library has been tested against the preservation requirements.
@@ -45,4 +44,4 @@ Parent task: `06-28-office-tools-phase1`.
 
 ## Remaining External Validation
 
-The unresolved acceptance items are `.xls` conversion with a real sample on a UOS ARM64 machine with WPS installed and direct `.et` library reading with representative `.et` samples. The local development machine has no WPS command candidates and no local `.xls` / `.et` samples, so `.xls` conversion and `.et` direct-read fidelity must not be treated as proven yet. `.et` must not be routed through WPS conversion. The local malformed-file probe now proves that text-like `.et` impostors are rejected before SheetJS can parse them as generic text sheets.
+The unresolved acceptance items are direct `.xls` and `.et` library reading with representative samples. The local development machine has no local `.xls` / `.et` samples, so direct-read fidelity for those formats must not be treated as proven yet. `.xls` and `.et` must not be routed through WPS conversion. The local malformed-file probe proves that text-like `.xls` and `.et` impostors are rejected before SheetJS can parse them as generic text sheets.

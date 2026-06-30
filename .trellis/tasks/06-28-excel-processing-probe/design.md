@@ -6,17 +6,17 @@ This child should create small scripts or test harnesses inside the app reposito
 
 ## Areas To Validate
 
-### WPS Conversion
+### XLS Direct Reader
 
 Validate:
 
-- how to locate WPS on UOS ARM64;
-- whether WPS can run `.xls` conversion without blocking the app UI;
-- conversion command arguments for `.xls`;
-- output path handling;
-- failure detection.
+- whether the selected library can open representative legacy `.xls` files directly;
+- sheet name, row count, display-value, merge, format, hidden row/column, and style metadata availability;
+- failure detection when an `.xls` file cannot be parsed;
+- file container preflight so text-like `.xls` impostors are not accepted through SheetJS generic text fallback;
+- the fallback message that tells the user to manually convert the file to `.xlsx`.
 
-If WPS cannot provide stable command-line conversion, Phase 1 must rely on the manual-conversion fallback for `.xls`. `.et` is no longer a WPS conversion input.
+If direct `.xls` reading cannot meet the required split/merge metadata needs, narrow the `.xls` support contract before implementation starts instead of adding WPS conversion back.
 
 ### ET Direct Reader
 
@@ -60,13 +60,13 @@ Write a short report in the task directory summarizing:
 
 ## Local Probe Findings
 
-The probe harness uses `exceljs` for `.xlsx` workbook read/write checks, SheetJS CE `xlsx` for direct `.et` read checks, and `yauzl` for read-only inspection of worksheet relationship files inside `.xlsx` archives.
+The probe harness uses `exceljs` for `.xlsx` workbook read/write checks, SheetJS CE `xlsx` for direct `.xls` / `.et` read checks, and `yauzl` for read-only inspection of worksheet relationship files inside `.xlsx` archives.
 
 Local findings from the development machine:
 
 - `exceljs` can read workbook/sheet names and preserve styles, column widths, row heights, merged cells, hidden row/column state, number/date formats, long-number text formatting, and saved formula results when explicit copy logic is used.
-- SheetJS CE `xlsx` is the selected direct `.et` reader candidate, but no local `.et` sample was available, so real `.et` fidelity is still a sample-validation gate.
-- SheetJS can parse text-like `.et` impostors as generic text sheets, so the probe now preflights `.et` files for CFB or ZIP workbook container signatures before accepting a read result.
+- SheetJS CE `xlsx` is the selected direct `.xls` / `.et` reader candidate, but no local `.xls` or `.et` sample was available, so real fidelity is still a sample-validation gate.
+- SheetJS can parse text-like workbook impostors as generic text sheets, so the probe now preflights `.xls` and `.et` files for CFB or ZIP workbook container signatures before accepting a read result.
 - Formulas without cached results do not expose a trustworthy calculated display value; production behavior should use saved results and warn or skip when no cached result is available.
 - Embedded-object detection can be implemented by checking `xl/worksheets/_rels/sheetN.xml.rels` for drawing, vmlDrawing, oleObject, or ctrlProp relationship types. Synthetic image detection worked per worksheet.
-- No WPS command was detected on the development machine, so `.xls` conversion remains a UOS ARM64 target validation gate.
+- `.xls` direct parsing must load SheetJS codepage tables so non-ASCII legacy workbooks decode correctly.

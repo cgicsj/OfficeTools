@@ -25,7 +25,7 @@ Office users can process common Excel split and merge tasks on a local UOS ARM64
 ## Task Map
 
 - `06-28-electron-platform`: create the Electron desktop app shell, renderer UI, IPC boundaries, dialogs, job/log state, cancellation plumbing, and persistence for last output directory.
-- `06-28-excel-processing-probe`: validate WPS `.xls` conversion, direct `.et` library reading, and Excel library behavior before feature implementation.
+- `06-28-excel-processing-probe`: validate direct `.xls` / `.et` library reading and Excel library behavior before feature implementation.
 - `06-28-excel-split`: implement the Excel split workflow.
 - `06-28-excel-merge`: implement the Excel merge workflow.
 - `06-28-uos-arm64-deb-integration`: package, install, and validate the integrated UOS ARM64 `.deb` release.
@@ -35,9 +35,9 @@ The parent task owns cross-child requirements and final integration acceptance. 
 ## Cross-Cutting Requirements
 
 - Supported input formats are `.xls`, `.xlsx`, and `.et`.
-- `.xls` is converted to `.xlsx` through locally installed WPS before processing.
+- `.xls` is read directly through a library that supports legacy Excel `.xls` files; do not convert `.xls` through WPS.
 - `.et` is read directly through a library that supports WPS `.et` files; do not convert `.et` through WPS.
-- If WPS is unavailable for `.xls`, `.xls` conversion fails, or the `.et` direct reader fails, show a dialog telling the user to manually convert the file to `.xlsx`; in a batch, skip the current file and continue.
+- If the `.xls` or `.et` direct reader fails, show a dialog telling the user to manually convert the file to `.xlsx`; in a batch, skip the current file and continue.
 - Output files are always `.xlsx`.
 - Excel processing must be offline.
 - Encrypted files are unsupported.
@@ -118,7 +118,7 @@ The parent task owns cross-child requirements and final integration acceptance. 
 - [ ] The final app runs as a local UOS ARM64 Electron desktop app.
 - [ ] The final `.deb` can be installed and launched on the target platform.
 - [ ] Split and merge workflows enforce the file type, size, count, unsupported-object, encrypted-file, and macro-file rules.
-- [ ] `.xls` conversion through WPS is attempted before processing; unavailable or failed conversion produces the specified dialog and skip behavior.
+- [ ] `.xls` files use the direct `.xls` library path instead of WPS conversion; reader failures produce the specified dialog and skip behavior.
 - [ ] `.et` files use the direct `.et` library path instead of WPS conversion; reader failures produce the specified dialog and skip behavior.
 - [ ] Output files use `.xlsx`.
 - [ ] Split output zip structure matches the grilling conclusion.

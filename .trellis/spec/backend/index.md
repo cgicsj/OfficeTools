@@ -18,7 +18,7 @@ There is no database, ORM, HTTP server, or logging framework in the current code
 | [directory-structure.md](./directory-structure.md) | Adding main, preload, service, or IPC files |
 | [ipc-handlers.md](./ipc-handlers.md) | Adding or changing IPC channels and preload APIs |
 | [services.md](./services.md) | File selection, preferences, temp workspace, job services |
-| [excel-processing.md](./excel-processing.md) | Excel adapters, WPS conversion gate, object detection |
+| [excel-processing.md](./excel-processing.md) | Excel adapters, direct `.xls` / `.et` readers, object detection |
 | [environment.md](./environment.md) | App startup, `userData`, build, package, or generated files |
 | [error-handling.md](./error-handling.md) | IPC result shapes and expected failures |
 | [type-safety.md](./type-safety.md) | Zod schemas, `ApiResult`, shared constants |

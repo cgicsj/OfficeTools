@@ -2,7 +2,7 @@
 
 ## Packaging
 
-Use the packaging tool selected by the Electron scaffold, configured to emit an ARM64 `.deb` artifact. The app should not bundle WPS. It must call the system installation through the same adapter used in development.
+Use the packaging tool selected by the Electron scaffold, configured to emit an ARM64 `.deb` artifact. The app should not bundle WPS. `.xls` and `.et` processing must use the direct reader adapter used in development.
 
 ## Runtime Paths
 
@@ -11,7 +11,7 @@ Validate packaged behavior for:
 - app cache/temp directory;
 - system Downloads directory;
 - user-selected output directories;
-- WPS executable detection;
+- Direct `.xls` / `.et` reader validation;
 - sample file access through system dialogs.
 
 ## Integration Scope

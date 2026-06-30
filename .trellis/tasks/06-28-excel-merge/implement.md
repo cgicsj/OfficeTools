@@ -25,7 +25,7 @@
 - Merge normal `.xlsx` files into one sheet.
 - Merge differing-header `.xlsx` files into one sheet.
 - Merge selected sheets into multiple sheets.
-- Merge `.xls` through WPS conversion.
+- Merge `.xls` through the direct `.xls` library adapter.
 - Merge `.et` through the direct `.et` library adapter.
 - Verify selected-sheet object rejection.
 - Verify automatic output rename.

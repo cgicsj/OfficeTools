@@ -6,45 +6,44 @@
 - Generated output directory: `.trellis/tasks/06-28-excel-processing-probe/probe-output`
 - Sample directory: `.trellis/tasks/06-28-excel-processing-probe/samples`
 - Candidate workbook library: `exceljs`
-- Candidate .et reader: `xlsx` / SheetJS CE
+- Candidate direct .xls/.et reader: `xlsx` / SheetJS CE
 - Candidate xlsx relationship inspector: `yauzl`
 
 ## Recommendation
 
 Use `exceljs` as the first Phase 1 `.xlsx` workbook adapter candidate. The synthetic round trip confirms workbook/sheet reading, writing, styles, widths, row heights, merge ranges, hidden rows/columns, number formats, and saved formula results can be preserved with explicit copy logic.
 
-Use SheetJS CE `xlsx` as the direct-read adapter candidate for WPS `.et` files. Do not route `.et` through WPS conversion. Real `.et` samples must still validate sheet names, display values, merge metadata, format metadata, hidden row/column metadata, and any required style preservation limits before split/merge implementation treats `.et` as fully supported.
+Use SheetJS CE `xlsx` as the direct-read adapter candidate for legacy `.xls` and WPS `.et` files. Do not route `.xls` or `.et` through WPS conversion. Real `.xls` and `.et` samples must still validate sheet names, display values, merge metadata, format metadata, hidden row/column metadata, and any required style preservation limits before split/merge implementation treats those formats as fully supported.
 
 Use a ZIP relationship inspection step for selected-sheet embedded object detection. The synthetic image workbook confirms worksheet-level drawing relationships can be detected without opening the workbook in the renderer. Validate this again with real chart/image/WPS-authored samples before split/merge implementation.
 
-Keep `.xls` support gated behind WPS conversion. This development machine did not prove UOS ARM64 WPS `.xls` conversion unless the WPS conversion section below says `tested`; run the same script on the target machine with `--run-wps-conversion` and sample `.xls` files before starting split/merge.
-
 ## Acceptance Matrix
 
-- [x] Probe report documents WPS command availability and conversion behavior.
-- [ ] `.xls` conversion tested with a sample file.
+- [ ] `.xls` direct library read tested with a sample file.
 - [ ] `.et` direct library read tested with a sample file.
+- [x] Malformed `.xls` input is rejected before SheetJS text fallback can treat it as a sheet.
 - [x] Malformed `.et` input is rejected before SheetJS text fallback can treat it as a sheet.
 - [x] Candidate Excel library tested against preservation requirements.
 - [x] Selected-sheet embedded object detection approach documented.
 - [x] Formula display-value limitations documented.
-- [x] Parent design updated with local probe findings, direct `.et` reader plan, and target-machine `.xls` WPS gate.
+- [x] Parent design updated with local probe findings and direct `.xls` / `.et` reader plan.
 
 ## Samples
 
 No local sample files were found. Put samples in the sample directory and rerun the script.
 
-## WPS Detection
-
-No WPS command candidates were detected on this machine.
-
-## WPS Conversion
+## SheetJS XLS Direct-Read Probe
 
 - Status: `skipped`
-- Reason: Pass --run-wps-conversion on a UOS ARM64 machine with WPS and sample .xls files to attempt conversion.
-- Run flag used: `false`
+- Reason: No .xls sample files were found. Add representative .xls samples and rerun the probe.
 
-No conversion command was executed in this run.
+No .xls direct-read attempt was executed in this run.
+
+### Malformed XLS Rejection
+
+- Artifact: `.trellis/tasks/06-28-excel-processing-probe/probe-output/malformed-direct-read.xls`
+- Result: `pass`
+- Detail: Unsupported .xls container signature; expected a CFB or ZIP workbook container.
 
 ## SheetJS ET Direct-Read Probe
 
@@ -99,8 +98,7 @@ Detection approach: inspect `xl/worksheets/_rels/sheetN.xml.rels` for relationsh
 
 ## Next Steps Before Split/Merge
 
-1. Add representative `.xls`, `.et`, styled `.xlsx`, and object-containing `.xlsx` samples under `.trellis/tasks/06-28-excel-processing-probe/samples` on a UOS ARM64 machine.
-2. Run `pnpm probe:excel -- --run-wps-conversion` from the repository root to validate WPS `.xls` conversion and SheetJS `.et` direct reading in the same report.
-3. If WPS `.xls` conversion fails, revise split/merge PRDs to use manual conversion for `.xls`.
-4. If SheetJS `.et` direct reading fails or cannot preserve required metadata from real samples, narrow the `.et` support contract before split/merge implementation starts.
-5. If real embedded object samples are not detected per selected sheet, conservatively block workbooks with any worksheet object relationship and update the parent design.
+1. Add representative `.xls`, `.et`, styled `.xlsx`, and object-containing `.xlsx` samples under `.trellis/tasks/06-28-excel-processing-probe/samples`.
+2. Run `pnpm probe:excel` from the repository root to validate SheetJS direct `.xls` and `.et` reading in the same report.
+3. If SheetJS direct reading fails or cannot preserve required metadata from real samples, narrow that file format support contract before split/merge implementation proceeds.
+4. If real embedded object samples are not detected per selected sheet, conservatively block workbooks with any worksheet object relationship and update the parent design.

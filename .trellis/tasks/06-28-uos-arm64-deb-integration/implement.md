@@ -8,7 +8,7 @@
 - [ ] Install on UOS ARM64 target environment.
 - [ ] Launch installed app.
 - [ ] Run file/folder/output dialog smoke tests.
-- [ ] Run WPS detection/conversion smoke test or verify fallback dialog.
+- [ ] Run direct `.xls` / `.et` reader smoke test or verify fallback dialog.
 - [ ] Run one split sample.
 - [ ] Run one merge sample.
 - [ ] Run cancel cleanup smoke test.

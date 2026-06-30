@@ -2,12 +2,15 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
+import * as cpexcel from 'xlsx/dist/cpexcel.full.mjs';
 import type {
   ParsedWorkbook,
   ParsedWorkbookSheet,
   ParseSplitDocumentsResult,
 } from '../../../shared/types/excel';
 import { getRegisteredFilePath } from '../file-selection/file-registry';
+
+XLSX.set_cptable(cpexcel);
 
 const PREVIEW_ROW_COUNT = 10;
 const ZIP_SIGNATURE = '504b';
@@ -120,10 +123,14 @@ const readSheetJsSheet = (sheetName: string, worksheet: XLSX.WorkSheet): ParsedW
   };
 };
 
-const parseEtWorkbook = async (sourceId: string, filePath: string): Promise<ParsedWorkbook> => {
+const parseSheetJsWorkbook = async (
+  sourceId: string,
+  filePath: string,
+  formatLabel: string,
+): Promise<ParsedWorkbook> => {
   const hasValidSignature = await hasWorkbookContainerSignature(filePath);
   if (!hasValidSignature) {
-    throw new Error('ET 文件格式无效，请使用 WPS 另存为有效表格文件后重试');
+    throw new Error(`${formatLabel} 文件格式无效，请另存为 .xlsx 后重试`);
   }
 
   const workbook = XLSX.readFile(filePath, {
@@ -149,12 +156,12 @@ const parseWorkbook = async (sourceId: string, filePath: string): Promise<Parsed
     return parseXlsxWorkbook(sourceId, filePath);
   }
 
-  if (extension === '.et') {
-    return parseEtWorkbook(sourceId, filePath);
+  if (extension === '.xls') {
+    return parseSheetJsWorkbook(sourceId, filePath, 'XLS');
   }
 
-  if (extension === '.xls') {
-    throw new Error('XLS 文件需要先通过 WPS 转换为 XLSX，当前解析链路尚未启用目标环境转换能力');
+  if (extension === '.et') {
+    return parseSheetJsWorkbook(sourceId, filePath, 'ET');
   }
 
   throw new Error('不支持的文件格式');

@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 /* global Buffer, process */
-import { spawnSync } from 'node:child_process';
 import * as nodeFs from 'node:fs';
 import { constants as fsConstants } from 'node:fs';
-import { access, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ExcelJS from 'exceljs';
@@ -25,25 +24,11 @@ const defaultReportPath = path.join(taskDirectory, 'report.md');
 const tinyPngBase64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 
-const wpsCommandCandidates = [
-  process.env.OFFICETOOLS_WPS_COMMAND,
-  'wps',
-  'et',
-  'wps-office',
-  '/opt/kingsoft/wps-office/office6/wps',
-  '/opt/kingsoft/wps-office/office6/et',
-  '/opt/apps/cn.wps.wps-office/files/kingsoft/wps-office/office6/wps',
-  '/opt/apps/cn.wps.wps-office/files/kingsoft/wps-office/office6/et',
-  '/opt/apps/cn.wps.wps-office-pro/files/kingsoft/wps-office/office6/wps',
-  '/opt/apps/cn.wps.wps-office-pro/files/kingsoft/wps-office/office6/et',
-].filter(Boolean);
-
 const parseArgs = (argv) => {
   const options = {
     sampleDirectory: defaultSampleDirectory,
     outputDirectory: defaultOutputDirectory,
     reportPath: defaultReportPath,
-    runWpsConversion: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -67,10 +52,6 @@ const parseArgs = (argv) => {
       index += 1;
       continue;
     }
-
-    if (arg === '--run-wps-conversion') {
-      options.runWpsConversion = true;
-    }
   }
 
   return options;
@@ -83,63 +64,6 @@ const pathExists = async (targetPath) => {
   } catch {
     return false;
   }
-};
-
-const isExecutablePath = async (targetPath) => {
-  try {
-    await access(targetPath, fsConstants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const resolveCommand = async (candidate) => {
-  if (path.isAbsolute(candidate)) {
-    return (await isExecutablePath(candidate)) ? candidate : undefined;
-  }
-
-  const result = spawnSync('which', [candidate], {
-    encoding: 'utf8',
-    timeout: 3000,
-  });
-
-  if (result.status === 0) {
-    return result.stdout.trim() || undefined;
-  }
-
-  return undefined;
-};
-
-const detectWpsCommands = async () => {
-  const seen = new Set();
-  const detected = [];
-
-  for (const candidate of wpsCommandCandidates) {
-    if (seen.has(candidate)) {
-      continue;
-    }
-    seen.add(candidate);
-
-    const resolvedPath = await resolveCommand(candidate);
-    if (!resolvedPath) {
-      continue;
-    }
-
-    const helpResult = spawnSync(resolvedPath, ['--help'], {
-      encoding: 'utf8',
-      timeout: 5000,
-    });
-
-    detected.push({
-      candidate,
-      resolvedPath,
-      helpExitCode: helpResult.status,
-      helpOutput: `${helpResult.stdout}${helpResult.stderr}`.trim().slice(0, 1200),
-    });
-  }
-
-  return detected;
 };
 
 const findSamples = async (sampleDirectory) => {
@@ -493,13 +417,13 @@ const detectWorkbookContainer = async (inputPath) => {
   return 'unknown';
 };
 
-const inspectSheetJsEtSample = async (sample) => {
+const inspectSheetJsDirectSample = async (sample, formatLabel) => {
   let containerType = 'unread';
 
   try {
     containerType = await detectWorkbookContainer(sample.path);
     if (containerType === 'unknown') {
-      throw new Error('Unsupported .et container signature; expected a CFB or ZIP workbook container.');
+      throw new Error(`Unsupported ${sample.extension} container signature; expected a CFB or ZIP workbook container.`);
     }
 
     const workbook = XLSX.readFile(sample.path, {
@@ -525,6 +449,7 @@ const inspectSheetJsEtSample = async (sample) => {
     return {
       name: sample.name,
       status: 'pass',
+      formatLabel,
       containerType,
       sheetNames: workbook.SheetNames,
       firstSheetName,
@@ -543,6 +468,7 @@ const inspectSheetJsEtSample = async (sample) => {
     return {
       name: sample.name,
       status: 'fail',
+      formatLabel,
       containerType,
       sheetNames: [],
       firstSheetName: '',
@@ -558,135 +484,47 @@ const inspectSheetJsEtSample = async (sample) => {
   }
 };
 
-const inspectSheetJsEtRead = async (samples) => {
-  const etSamples = samples.filter((sample) => sample.extension === '.et');
+const inspectSheetJsDirectRead = async (samples, extension, formatLabel) => {
+  const directSamples = samples.filter((sample) => sample.extension === extension);
 
-  if (etSamples.length === 0) {
+  if (directSamples.length === 0) {
     return {
       status: 'skipped',
-      reason: 'No .et sample files were found. Add representative .et samples and rerun the probe.',
-      etSamples,
+      reason: `No ${extension} sample files were found. Add representative ${extension} samples and rerun the probe.`,
+      samples: directSamples,
       reads: [],
     };
   }
 
-  const reads = await Promise.all(etSamples.map((sample) => inspectSheetJsEtSample(sample)));
+  const reads = await Promise.all(
+    directSamples.map((sample) => inspectSheetJsDirectSample(sample, formatLabel)),
+  );
 
   return {
     status: reads.every((read) => read.status === 'pass') ? 'tested' : 'failed',
-    reason: 'SheetJS direct .et read attempts completed.',
-    etSamples,
+    reason: `SheetJS direct ${extension} read attempts completed.`,
+    samples: directSamples,
     reads,
   };
 };
 
-const inspectMalformedEtRejection = async (outputDirectory) => {
-  const malformedEtPath = path.join(outputDirectory, 'malformed-direct-read.et');
-  await writeFile(malformedEtPath, 'not a WPS ET workbook', 'utf8');
+const inspectMalformedDirectRejection = async (outputDirectory, extension, formatLabel) => {
+  const malformedPath = path.join(outputDirectory, `malformed-direct-read${extension}`);
+  await writeFile(malformedPath, `not a ${formatLabel} workbook`, 'utf8');
 
-  const read = await inspectSheetJsEtSample({
-    name: path.basename(malformedEtPath),
-    path: malformedEtPath,
-    extension: '.et',
-    sizeBytes: Buffer.byteLength('not a WPS ET workbook'),
-  });
+  const read = await inspectSheetJsDirectSample({
+    name: path.basename(malformedPath),
+    path: malformedPath,
+    extension,
+    sizeBytes: Buffer.byteLength(`not a ${formatLabel} workbook`),
+  }, formatLabel);
 
   return {
-    malformedEtPath,
+    malformedPath,
     read,
     passed: read.status === 'fail' && read.containerType === 'unknown',
   };
 };
-
-const attemptWpsConversion = async ({ commandPath, inputPath, outputDirectory }) => {
-  const attempts = [
-    ['--headless', '--convert-to', 'xlsx', '--outdir', outputDirectory, inputPath],
-    ['--convert-to', 'xlsx', '--outdir', outputDirectory, inputPath],
-  ];
-  const expectedOutputPath = path.join(
-    outputDirectory,
-    `${path.basename(inputPath, path.extname(inputPath))}.xlsx`,
-  );
-  const results = [];
-
-  for (const args of attempts) {
-    await rm(expectedOutputPath, { force: true });
-    const result = spawnSync(commandPath, args, {
-      encoding: 'utf8',
-      timeout: 30000,
-    });
-    const outputExists = await pathExists(expectedOutputPath);
-    results.push({
-      args,
-      exitCode: result.status,
-      signal: result.signal,
-      outputExists,
-      stdout: result.stdout.trim().slice(0, 1200),
-      stderr: result.stderr.trim().slice(0, 1200),
-    });
-
-    if (outputExists) {
-      break;
-    }
-  }
-
-  return {
-    inputPath,
-    expectedOutputPath,
-    results,
-  };
-};
-
-const runWpsConversionProbes = async ({ detectedCommands, samples, outputDirectory, runWpsConversion }) => {
-  const xlsSamples = samples.filter((sample) => sample.extension === '.xls');
-  const commandPath = detectedCommands[0]?.resolvedPath;
-
-  if (!runWpsConversion) {
-    return {
-      status: 'skipped',
-      reason: 'Pass --run-wps-conversion on a UOS ARM64 machine with WPS and sample .xls files to attempt conversion.',
-      xlsSamples,
-      attempts: [],
-    };
-  }
-
-  if (!commandPath) {
-    return {
-      status: 'blocked',
-      reason: 'No WPS command was detected.',
-      xlsSamples,
-      attempts: [],
-    };
-  }
-
-  const conversionSamples = xlsSamples.slice(0, 1);
-  if (conversionSamples.length === 0) {
-    return {
-      status: 'blocked',
-      reason: 'No .xls sample files were found.',
-      xlsSamples,
-      attempts: [],
-    };
-  }
-
-  const attempts = [];
-  for (const sample of conversionSamples) {
-    attempts.push(await attemptWpsConversion({
-      commandPath,
-      inputPath: sample.path,
-      outputDirectory,
-    }));
-  }
-
-  return {
-    status: attempts.some((attempt) => attempt.results.some((result) => result.outputExists)) ? 'tested' : 'failed',
-    reason: 'WPS conversion command attempts completed.',
-    xlsSamples,
-    attempts,
-  };
-};
-
-const formatBoolean = (value) => (value ? 'yes' : 'no');
 
 const markdownTable = (headers, rows) => {
   const headerLine = `| ${headers.join(' | ')} |`;
@@ -697,13 +535,13 @@ const markdownTable = (headers, rows) => {
 
 const buildReport = ({
   options,
-  detectedCommands,
   samples,
   excelJsProbe,
   objectDetectionProbe,
+  sheetJsXlsProbe,
   sheetJsEtProbe,
+  malformedXlsProbe,
   malformedEtProbe,
-  wpsConversionProbe,
 }) => {
   const excelRows = excelJsProbe.checks.map((check) => [
     check.name,
@@ -724,20 +562,19 @@ const buildReport = ({
     String(sample.sizeBytes),
   ]);
 
-  const wpsRows = detectedCommands.map((command) => [
-    command.candidate,
-    command.resolvedPath,
-    String(command.helpExitCode),
-    command.helpOutput.replace(/\|/g, '\\|').replace(/\n/g, '<br>') || '-',
+  const xlsReadRows = sheetJsXlsProbe.reads.map((read) => [
+    read.name,
+    read.status,
+    read.containerType,
+    read.sheetNames.join(', ') || '-',
+    read.firstSheetName || '-',
+    String(read.rowCount),
+    String(read.columnCount),
+    String(read.mergeCount),
+    String(read.formattedCellCount),
+    String(read.styleCellCount),
+    read.error.replace(/\|/g, '\\|').replace(/\n/g, '<br>') || '-',
   ]);
-
-  const conversionRows = wpsConversionProbe.attempts.flatMap((attempt) => attempt.results.map((result) => [
-    path.basename(attempt.inputPath),
-    result.args.join(' '),
-    String(result.exitCode),
-    formatBoolean(result.outputExists),
-    (result.stderr || result.stdout || '-').replace(/\|/g, '\\|').replace(/\n/g, '<br>'),
-  ]));
 
   const etReadRows = sheetJsEtProbe.reads.map((read) => [
     read.name,
@@ -761,45 +598,44 @@ const buildReport = ({
 - Generated output directory: \`${path.relative(repoRoot, options.outputDirectory)}\`
 - Sample directory: \`${path.relative(repoRoot, options.sampleDirectory)}\`
 - Candidate workbook library: \`exceljs\`
-- Candidate .et reader: \`xlsx\` / SheetJS CE
+- Candidate direct .xls/.et reader: \`xlsx\` / SheetJS CE
 - Candidate xlsx relationship inspector: \`yauzl\`
 
 ## Recommendation
 
 Use \`exceljs\` as the first Phase 1 \`.xlsx\` workbook adapter candidate. The synthetic round trip confirms workbook/sheet reading, writing, styles, widths, row heights, merge ranges, hidden rows/columns, number formats, and saved formula results can be preserved with explicit copy logic.
 
-Use SheetJS CE \`xlsx\` as the direct-read adapter candidate for WPS \`.et\` files. Do not route \`.et\` through WPS conversion. Real \`.et\` samples must still validate sheet names, display values, merge metadata, format metadata, hidden row/column metadata, and any required style preservation limits before split/merge implementation treats \`.et\` as fully supported.
+Use SheetJS CE \`xlsx\` as the direct-read adapter candidate for legacy \`.xls\` and WPS \`.et\` files. Do not route \`.xls\` or \`.et\` through WPS conversion. Real \`.xls\` and \`.et\` samples must still validate sheet names, display values, merge metadata, format metadata, hidden row/column metadata, and any required style preservation limits before split/merge implementation treats those formats as fully supported.
 
 Use a ZIP relationship inspection step for selected-sheet embedded object detection. The synthetic image workbook confirms worksheet-level drawing relationships can be detected without opening the workbook in the renderer. Validate this again with real chart/image/WPS-authored samples before split/merge implementation.
 
-Keep \`.xls\` support gated behind WPS conversion. This development machine did not prove UOS ARM64 WPS \`.xls\` conversion unless the WPS conversion section below says \`tested\`; run the same script on the target machine with \`--run-wps-conversion\` and sample \`.xls\` files before starting split/merge.
-
 ## Acceptance Matrix
 
-- [x] Probe report documents WPS command availability and conversion behavior.
-- [${wpsConversionProbe.status === 'tested' ? 'x' : ' '}] \`.xls\` conversion tested with a sample file.
+- [${sheetJsXlsProbe.status === 'tested' ? 'x' : ' '}] \`.xls\` direct library read tested with a sample file.
 - [${sheetJsEtProbe.status === 'tested' ? 'x' : ' '}] \`.et\` direct library read tested with a sample file.
+- [${malformedXlsProbe.passed ? 'x' : ' '}] Malformed \`.xls\` input is rejected before SheetJS text fallback can treat it as a sheet.
 - [${malformedEtProbe.passed ? 'x' : ' '}] Malformed \`.et\` input is rejected before SheetJS text fallback can treat it as a sheet.
 - [x] Candidate Excel library tested against preservation requirements.
 - [x] Selected-sheet embedded object detection approach documented.
 - [x] Formula display-value limitations documented.
-- [x] Parent design updated with local probe findings, direct \`.et\` reader plan, and target-machine \`.xls\` WPS gate.
+- [x] Parent design updated with local probe findings and direct \`.xls\` / \`.et\` reader plan.
 
 ## Samples
 
 ${sampleRows.length > 0 ? markdownTable(['File', 'Extension', 'Size bytes'], sampleRows) : 'No local sample files were found. Put samples in the sample directory and rerun the script.'}
 
-## WPS Detection
+## SheetJS XLS Direct-Read Probe
 
-${wpsRows.length > 0 ? markdownTable(['Candidate', 'Resolved path', 'Help exit', 'Help output excerpt'], wpsRows) : 'No WPS command candidates were detected on this machine.'}
+- Status: \`${sheetJsXlsProbe.status}\`
+- Reason: ${sheetJsXlsProbe.reason}
 
-## WPS Conversion
+${xlsReadRows.length > 0 ? markdownTable(['File', 'Result', 'Container', 'Sheets', 'First sheet', 'Rows', 'Columns', 'Merges', 'Formatted cells', 'Style cells', 'Error'], xlsReadRows) : 'No .xls direct-read attempt was executed in this run.'}
 
-- Status: \`${wpsConversionProbe.status}\`
-- Reason: ${wpsConversionProbe.reason}
-- Run flag used: \`${String(options.runWpsConversion)}\`
+### Malformed XLS Rejection
 
-${conversionRows.length > 0 ? markdownTable(['Input', 'Args', 'Exit', 'Output exists', 'Output excerpt'], conversionRows) : 'No conversion command was executed in this run.'}
+- Artifact: \`${path.relative(repoRoot, malformedXlsProbe.malformedPath)}\`
+- Result: \`${malformedXlsProbe.passed ? 'pass' : 'fail'}\`
+- Detail: ${malformedXlsProbe.read.error || 'Malformed input was unexpectedly accepted.'}
 
 ## SheetJS ET Direct-Read Probe
 
@@ -810,7 +646,7 @@ ${etReadRows.length > 0 ? markdownTable(['File', 'Result', 'Container', 'Sheets'
 
 ### Malformed ET Rejection
 
-- Artifact: \`${path.relative(repoRoot, malformedEtProbe.malformedEtPath)}\`
+- Artifact: \`${path.relative(repoRoot, malformedEtProbe.malformedPath)}\`
 - Result: \`${malformedEtProbe.passed ? 'pass' : 'fail'}\`
 - Detail: ${malformedEtProbe.read.error || 'Malformed input was unexpectedly accepted.'}
 
@@ -841,11 +677,10 @@ Detection approach: inspect \`xl/worksheets/_rels/sheetN.xml.rels\` for relation
 
 ## Next Steps Before Split/Merge
 
-1. Add representative \`.xls\`, \`.et\`, styled \`.xlsx\`, and object-containing \`.xlsx\` samples under \`${path.relative(repoRoot, options.sampleDirectory)}\` on a UOS ARM64 machine.
-2. Run \`pnpm probe:excel -- --run-wps-conversion\` from the repository root to validate WPS \`.xls\` conversion and SheetJS \`.et\` direct reading in the same report.
-3. If WPS \`.xls\` conversion fails, revise split/merge PRDs to use manual conversion for \`.xls\`.
-4. If SheetJS \`.et\` direct reading fails or cannot preserve required metadata from real samples, narrow the \`.et\` support contract before split/merge implementation starts.
-5. If real embedded object samples are not detected per selected sheet, conservatively block workbooks with any worksheet object relationship and update the parent design.
+1. Add representative \`.xls\`, \`.et\`, styled \`.xlsx\`, and object-containing \`.xlsx\` samples under \`${path.relative(repoRoot, options.sampleDirectory)}\`.
+2. Run \`pnpm probe:excel\` from the repository root to validate SheetJS direct \`.xls\` and \`.et\` reading in the same report.
+3. If SheetJS direct reading fails or cannot preserve required metadata from real samples, narrow that file format support contract before split/merge implementation proceeds.
+4. If real embedded object samples are not detected per selected sheet, conservatively block workbooks with any worksheet object relationship and update the parent design.
 `;
 };
 
@@ -855,28 +690,23 @@ const main = async () => {
   await mkdir(options.sampleDirectory, { recursive: true });
   await writeFile(path.join(options.outputDirectory, '.gitignore'), '*\n!.gitignore\n', 'utf8');
 
-  const detectedCommands = await detectWpsCommands();
   const samples = await findSamples(options.sampleDirectory);
   const excelJsProbe = await inspectExcelJsRoundTrip(options.outputDirectory);
   const objectDetectionProbe = await inspectObjectDetection(options.outputDirectory);
-  const sheetJsEtProbe = await inspectSheetJsEtRead(samples);
-  const malformedEtProbe = await inspectMalformedEtRejection(options.outputDirectory);
-  const wpsConversionProbe = await runWpsConversionProbes({
-    detectedCommands,
-    samples,
-    outputDirectory: options.outputDirectory,
-    runWpsConversion: options.runWpsConversion,
-  });
+  const sheetJsXlsProbe = await inspectSheetJsDirectRead(samples, '.xls', 'XLS');
+  const sheetJsEtProbe = await inspectSheetJsDirectRead(samples, '.et', 'ET');
+  const malformedXlsProbe = await inspectMalformedDirectRejection(options.outputDirectory, '.xls', 'XLS');
+  const malformedEtProbe = await inspectMalformedDirectRejection(options.outputDirectory, '.et', 'ET');
 
   const report = buildReport({
     options,
-    detectedCommands,
     samples,
     excelJsProbe,
     objectDetectionProbe,
+    sheetJsXlsProbe,
     sheetJsEtProbe,
+    malformedXlsProbe,
     malformedEtProbe,
-    wpsConversionProbe,
   });
   await writeFile(options.reportPath, report, 'utf8');
 
@@ -886,7 +716,9 @@ const main = async () => {
   if (
     failedChecks.length > 0 ||
     !objectDetectionProbe.passed ||
+    sheetJsXlsProbe.status === 'failed' ||
     sheetJsEtProbe.status === 'failed' ||
+    !malformedXlsProbe.passed ||
     !malformedEtProbe.passed
   ) {
     process.stderr.write('One or more probe checks failed. Review the report for details.\n');

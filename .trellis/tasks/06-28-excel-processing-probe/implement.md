@@ -3,9 +3,9 @@
 ## Checklist
 
 - [x] Add sample workbook location or document where samples must be placed locally.
-- [x] Create a WPS detection probe.
-- [x] Create `.xls` conversion probe.
+- [x] Create `.xls` direct library read probe.
 - [x] Create `.et` direct library read probe.
+- [x] Create malformed `.xls` rejection probe for SheetJS text fallback.
 - [x] Create malformed `.et` rejection probe for SheetJS text fallback.
 - [x] Create workbook read/write probe for `.xlsx`.
 - [x] Create style preservation probe.
@@ -18,9 +18,9 @@
 ## Validation
 
 - Run probes on the development machine.
-- Run WPS-specific `.xls` probes on UOS ARM64 when available.
+- Run direct `.xls` library read probes with representative `.xls` samples.
 - Run direct `.et` library read probes with representative `.et` samples.
-- Confirm malformed `.et` files are rejected before generic text fallback.
+- Confirm malformed `.xls` and `.et` files are rejected before generic text fallback.
 - Manually inspect generated files from preservation probes.
 
 ## Rollback
@@ -29,10 +29,10 @@ If a requirement cannot be supported, stop before implementing split/merge and r
 
 ## Target Validation Pending
 
-The local probe harness is complete and ran successfully on this development machine. Full `.xls` WPS conversion validation remains blocked until a UOS ARM64 machine with WPS and representative `.xls` samples is available. Direct `.et` reading also remains blocked until representative `.et` samples are available. Run:
+The local probe harness is complete and ran successfully on this development machine. Direct `.xls` and `.et` reading remain blocked until representative samples are available. Run:
 
 ```bash
-pnpm probe:excel -- --run-wps-conversion
+pnpm probe:excel
 ```
 
-Do not treat automatic `.xls` conversion or direct `.et` reading as proven until that target-machine/sample run is recorded in `report.md`. `.et` must not be converted through WPS.
+Do not treat direct `.xls` or `.et` reading as proven until that sample run is recorded in `report.md`. `.xls` and `.et` must not be converted through WPS.

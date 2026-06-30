@@ -20,9 +20,9 @@ Depends on:
 - Before parsing, the sheet, field-name row, and split-column controls stay empty and disabled.
 - After parsing, the sheet control lists every workbook sheet, the field-name row control lists rows 1 through 10, and split columns display as `（A）字段名`, `（B）字段名`, and so on.
 - Process files one by one with per-file interaction.
-- Convert `.xls` through WPS before parsing.
+- Parse `.xls` through the direct `.xls` library adapter without WPS conversion.
 - Parse `.et` through the direct `.et` library adapter without WPS conversion.
-- If `.xls` WPS conversion fails or `.et` direct reading fails, show the manual-conversion dialog, skip the file, and continue.
+- If `.xls` or `.et` direct reading fails, show the manual-conversion dialog, skip the file, and continue.
 - Let the user select a sheet per file, defaulting to the first sheet.
 - Show selected input files by file name only in the main file list, with the full source path available through hover tooltip.
 - Allow users to remove selected input files individually before processing.
