@@ -1,6 +1,8 @@
 import type { ApiResult } from './api';
+import type { ParseSplitDocumentsInput, ParseSplitDocumentsResult } from './excel';
 import type { SelectedFile, SelectedFolder } from './files';
 import type { JobEvent } from './jobs';
+import type { OpenDirectoryInput } from './paths';
 import type { SetLastOutputDirectoryInput } from './preferences';
 
 export type OfficeToolsApi = {
@@ -12,7 +14,13 @@ export type OfficeToolsApi = {
   paths: {
     getDefaultOutputDirectory: () => Promise<ApiResult<string>>;
     getLastOutputDirectory: () => Promise<ApiResult<string | undefined>>;
+    openDirectory: (input: OpenDirectoryInput) => Promise<ApiResult<void>>;
     setLastOutputDirectory: (input: SetLastOutputDirectoryInput) => Promise<ApiResult<void>>;
+  };
+  excel: {
+    parseSplitDocuments: (
+      input: ParseSplitDocumentsInput,
+    ) => Promise<ApiResult<ParseSplitDocumentsResult>>;
   };
   jobs: {
     cancelActiveJob: () => Promise<ApiResult<void>>;

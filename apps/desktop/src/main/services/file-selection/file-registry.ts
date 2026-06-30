@@ -22,6 +22,7 @@ export const registerSelectedFiles = async (filePaths: string[]): Promise<Select
       name: path.basename(filePath),
       extension: getExtension(filePath),
       sizeBytes: fileStats.size,
+      displayPath: filePath,
     });
   }
 

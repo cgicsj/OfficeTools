@@ -11,6 +11,7 @@ export type SelectedFile = {
   name: string;
   extension: string;
   sizeBytes: number;
+  displayPath: string;
 };
 
 export type SelectedFolder = {

@@ -59,11 +59,15 @@ The parent task owns cross-child requirements and final integration acceptance. 
 - Users can select 1 to 20 files.
 - Each file must be at most 10 MB.
 - The user clicks `解析文档` before per-file setup.
+- Before parsing, the sheet, field-name row, and split-column controls are empty and disabled.
+- After parsing, sheet options list all sheets, field-name row lists rows 1 through 10, and split-column options display as `（A）字段名`, `（B）字段名`, and so on.
 - Files are handled one by one.
 - For each file, the user selects a sheet; the first sheet is selected by default.
 - The user selects the field-name row.
 - The field-name row and all earlier rows are the title area.
 - Split-column options are read from the field-name row.
+- The split file list shows file names only, exposes full source paths through hover tooltip, and supports individual removal before processing.
+- After the user chooses `保存至`, the split settings panel displays the selected output directory.
 - Merged field-name cells display the merged value.
 - Duplicate field names include column letters, for example `金额 (A列)`.
 - Empty field names display as `未命名列 (C列)` and are selectable.
@@ -77,6 +81,8 @@ The parent task owns cross-child requirements and final integration acceptance. 
 - A single source workbook can produce at most 500 split files; exceeding the limit blocks processing with a dialog.
 - All input files in one split batch produce one final zip.
 - Each input file gets its own folder inside the zip.
+- After split completion, a dialog shows `确认` and `打开输出文件夹`, and the log records completion.
+- Cancel during split processing asks the user to choose `跳过当前文件` or `取消所有任务`.
 
 ## Excel Merge Requirements
 

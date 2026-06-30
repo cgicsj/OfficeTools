@@ -14,8 +14,13 @@ const officeToolsApi: OfficeToolsApi = {
     getDefaultOutputDirectory: () =>
       ipcRenderer.invoke(IPC_CHANNELS.PATHS.GET_DEFAULT_OUTPUT_DIRECTORY),
     getLastOutputDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.PATHS.GET_LAST_OUTPUT_DIRECTORY),
+    openDirectory: (input) => ipcRenderer.invoke(IPC_CHANNELS.PATHS.OPEN_DIRECTORY, input),
     setLastOutputDirectory: (input: SetLastOutputDirectoryInput) =>
       ipcRenderer.invoke(IPC_CHANNELS.PATHS.SET_LAST_OUTPUT_DIRECTORY, input),
+  },
+  excel: {
+    parseSplitDocuments: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXCEL.PARSE_SPLIT_DOCUMENTS, input),
   },
   jobs: {
     cancelActiveJob: () => ipcRenderer.invoke(IPC_CHANNELS.JOB.CANCEL_ACTIVE),

@@ -7,7 +7,11 @@ export const IPC_CHANNELS = {
   PATHS: {
     GET_DEFAULT_OUTPUT_DIRECTORY: 'paths:get-default-output-directory',
     GET_LAST_OUTPUT_DIRECTORY: 'paths:get-last-output-directory',
+    OPEN_DIRECTORY: 'paths:open-directory',
     SET_LAST_OUTPUT_DIRECTORY: 'paths:set-last-output-directory',
+  },
+  EXCEL: {
+    PARSE_SPLIT_DOCUMENTS: 'excel:parse-split-documents',
   },
   JOB: {
     CANCEL_ACTIVE: 'job:cancel-active',
