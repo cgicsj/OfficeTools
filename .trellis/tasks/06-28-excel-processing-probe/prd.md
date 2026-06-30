@@ -27,16 +27,20 @@ Parent task: `06-28-office-tools-phase1`.
 
 ## Acceptance Criteria
 
-- [ ] A probe report documents WPS command availability and conversion behavior.
+- [x] A probe report documents WPS command availability and conversion behavior.
 - [ ] `.xls` conversion has been tested with a sample file.
-- [ ] `.et` conversion has been tested with a sample file or documented as blocked by local WPS availability.
-- [ ] At least one candidate Excel library has been tested against the preservation requirements.
-- [ ] The selected-sheet embedded object detection approach is documented.
-- [ ] Formula display-value limitations are documented.
-- [ ] The parent design is updated if the probe changes technical assumptions.
+- [x] `.et` conversion has been tested with a sample file or documented as blocked by local WPS availability.
+- [x] At least one candidate Excel library has been tested against the preservation requirements.
+- [x] The selected-sheet embedded object detection approach is documented.
+- [x] Formula display-value limitations are documented.
+- [x] The parent design is updated if the probe changes technical assumptions.
 
 ## Out Of Scope
 
 - Full production split implementation.
 - Full production merge implementation.
 - `.deb` packaging.
+
+## Remaining External Validation
+
+The only unresolved acceptance item is `.xls` conversion with a real sample on a UOS ARM64 machine with WPS installed. The local development machine has no WPS command candidates and no local `.xls` / `.et` samples, so automatic conversion must not be treated as proven yet.

@@ -20,11 +20,11 @@ Keep `.xls` and `.et` support gated behind WPS conversion. This development mach
 
 - [x] Probe report documents WPS command availability and conversion behavior.
 - [ ] `.xls` conversion tested with a sample file.
-- [ ] `.et` conversion tested with a sample file or documented as blocked by local WPS availability.
+- [x] `.et` conversion tested with a sample file or documented as blocked by local WPS availability.
 - [x] Candidate Excel library tested against preservation requirements.
 - [x] Selected-sheet embedded object detection approach documented.
 - [x] Formula display-value limitations documented.
-- [ ] Parent design updated only if target-machine WPS or real workbook samples change assumptions.
+- [x] Parent design updated with local probe findings and target-machine WPS gate.
 
 ## Samples
 
