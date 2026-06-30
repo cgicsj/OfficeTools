@@ -38,3 +38,35 @@ Completed OfficeTools Electron desktop platform scaffold, verified typecheck/lin
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: Refresh OfficeTools Trellis guidelines
+
+**Date**: 2026-06-30
+**Task**: Refresh OfficeTools Trellis guidelines
+
+### Summary
+
+Rewrote Trellis specs from the actual OfficeTools Electron Forge/Vite/React codebase, removed obsolete template guidance, validated links, lint, and typecheck, then archived the bootstrap guidelines task.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fe7476f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
