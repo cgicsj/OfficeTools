@@ -1,0 +1,32 @@
+{
+  "id": "office-tools-phase1",
+  "name": "office-tools-phase1",
+  "title": "OfficeTools 一期",
+  "description": "",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "chenggong",
+  "assignee": "chenggong",
+  "createdAt": "2026-06-28",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "06-28-electron-platform",
+    "06-28-excel-processing-probe",
+    "06-28-excel-split",
+    "06-28-excel-merge",
+    "06-28-uos-arm64-deb-integration"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

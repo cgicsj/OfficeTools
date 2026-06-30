@@ -1,0 +1,19 @@
+{
+  "name": "office-tools-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "OfficeTools desktop workspace",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @office-tools/desktop dev",
+    "build": "pnpm --filter @office-tools/desktop build",
+    "make": "pnpm --filter @office-tools/desktop make",
+    "lint": "pnpm --filter @office-tools/desktop lint",
+    "typecheck": "pnpm --filter @office-tools/desktop typecheck"
+  }
+}
+
