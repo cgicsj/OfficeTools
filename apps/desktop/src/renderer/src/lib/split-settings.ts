@@ -65,15 +65,34 @@ export const createSplitColumnOptions = (
 
   const rowValues = sheet.previewRows[rowNumber - 1] ?? [];
   const columnCount = Math.max(sheet.columnCount, rowValues.length);
+  const normalizedFieldCounts = new Map<string, number>();
+
+  rowValues.forEach((fieldValue) => {
+    const normalizedFieldName = fieldValue.trim();
+    if (normalizedFieldName === '') {
+      return;
+    }
+
+    normalizedFieldCounts.set(
+      normalizedFieldName,
+      (normalizedFieldCounts.get(normalizedFieldName) ?? 0) + 1,
+    );
+  });
 
   return Array.from({ length: columnCount }, (_column, index) => {
     const columnNumber = index + 1;
     const columnLetter = getColumnLetter(columnNumber);
-    const fieldName = rowValues[index]?.trim() || '未命名列';
+    const fieldName = rowValues[index]?.trim() ?? '';
+    const isDuplicate = fieldName !== '' && (normalizedFieldCounts.get(fieldName) ?? 0) > 1;
+    const displayFieldName = fieldName === ''
+      ? `未命名列 (${columnLetter}列)`
+      : isDuplicate
+        ? `${fieldName} (${columnLetter}列)`
+        : fieldName;
 
     return {
       value: String(columnNumber),
-      label: `（${columnLetter}）${fieldName}`,
+      label: `（${columnLetter}）${displayFieldName}`,
     };
   });
 };

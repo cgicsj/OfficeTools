@@ -136,6 +136,117 @@ if (formulaResult === undefined) {
 }
 ```
 
+
+## Scenario: Split Job Output Generation
+
+### 1. Scope / Trigger
+
+Use this spec when implementing or changing the production split workflow from renderer settings through main-process output generation. This is a cross-layer contract because it changes shared Zod input, preload API, IPC handler behavior, job events, filesystem output, and renderer state.
+
+### 2. Signatures
+
+Current shared contracts live in `apps/desktop/src/shared/types/excel.ts`:
+
+```typescript
+const startSplitJobInputSchema = z.object({
+  outputDirectory: z.string().min(1),
+  files: z.array(z.object({
+    sourceId: z.string().min(1),
+    sheetName: z.string().min(1),
+    fieldRow: z.number().int().min(1).max(10),
+    splitColumn: z.number().int().min(1),
+  })).min(1),
+});
+
+type SplitJobResult = {
+  outputDirectory: string;
+  outputPath: string;
+  files: SplitJobFileResult[];
+};
+```
+
+The preload API is `window.officeTools.excel.startSplitJob(input)` and the IPC channel is `IPC_CHANNELS.EXCEL.START_SPLIT_JOB`.
+
+### 3. Contracts
+
+- Renderer sends only `sourceId`, selected sheet name, numeric field row, numeric split column, and output directory. It does not send source paths.
+- Main process resolves each `sourceId` through `getRegisteredFilePath`.
+- `.xlsx` split output uses `exceljs` and copies title rows, selected data rows, styles, column widths, row heights, hidden state, number formats, and title-area merged cells.
+- `.xls` and `.et` split output uses SheetJS CE direct reading without WPS conversion and writes `.xlsx` output files.
+- The split value is the selected-column display text. Empty display text writes to `原文件名_空值.xlsx`.
+- File name parts replace illegal filename characters with `_`; duplicate output names and duplicate source folders get numeric suffixes.
+- One batch writes one `总拆分结果.zip` under the selected output directory. If the zip already exists, append a numeric suffix.
+- Each input file gets its own folder inside the zip. Temporary folders must be keyed by `sourceId` so two same-named source files cannot overwrite each other before zipping.
+- Job progress, logs, and per-file status changes are emitted through `IPC_CHANNELS.JOB.EVENT`.
+
+### 4. Validation & Error Matrix
+
+| Condition | Expected Behavior |
+| --- | --- |
+| Invalid split job payload | `ApiResult` failure with `INVALID_SPLIT_JOB_INPUT`. |
+| `sourceId` no longer resolves | Mark that file failed and continue batch. |
+| Selected sheet missing | Mark that file failed and continue batch. |
+| Selected `.xlsx` sheet has drawing/vml/ole/control relationship | Mark that file failed and continue batch. |
+| Formula cell has no cached result | Mark that file failed; do not output formula text. |
+| A source file would produce more than `APP_CONFIG.LIMITS.MAX_SPLIT_OUTPUT_FILES` outputs | Mark that file failed with a user-facing limit message. |
+| File has no non-empty data rows after the field row | Mark that file skipped and continue batch. |
+| All files fail or skip with no outputs | Return `SPLIT_JOB_FAILED` and produce no zip. |
+| User cancels all | Abort remaining work, delete temp workspace, return `JOB_CANCELED`, and produce no zip. |
+| User skips current file | Mark current file skipped and continue later files when the service reaches an interruption check. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: one styled `.xlsx` source produces `总拆分结果.zip/sourceName/sourceName_value.xlsx` and preserves the title area and formatting.
+- Good: two same-named source files from different directories produce separate zip folders such as `sourceName/` and `sourceName_2/`.
+- Base: a direct `.xls` or `.et` file with readable SheetJS metadata is split without WPS conversion and writes `.xlsx` outputs.
+- Bad: a selected `.xlsx` sheet with a drawing relationship is blocked before writing output files.
+- Bad: a renamed text file with `.xls` or `.et` extension is rejected by container preflight before SheetJS generic text fallback can accept it.
+
+### 6. Tests Required
+
+Run these before reporting split changes complete:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm build
+pnpm probe:excel
+```
+
+Manual or automated sample assertions must cover:
+
+- normal `.xlsx` split;
+- merged-title `.xlsx` split;
+- styled/date/long-number `.xlsx` split;
+- direct `.xls` split when representative samples exist;
+- direct `.et` split when representative samples exist;
+- selected-sheet object rejection;
+- cancel-all cleanup and no zip output;
+- duplicate source-name folder suffixes and duplicate split-value filename suffixes.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```typescript
+// Renderer simulates completion and never asks the main process to write files.
+window.setTimeout(() => finishSplitJob(), 900);
+
+// Same-named source files share a temp folder and can overwrite each other.
+const outputFolderPath = path.join(workspace.rootPath, sourceBaseName);
+```
+
+#### Correct
+
+```typescript
+const result = await window.officeTools.excel.startSplitJob({
+  outputDirectory,
+  files: [{ sourceId, sheetName, fieldRow, splitColumn }],
+});
+
+const outputFolderPath = path.join(workspace.rootPath, sourceId);
+```
+
 ## Probe Harness
 
 The probe script is development tooling, not production UI. It writes:

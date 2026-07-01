@@ -12,9 +12,11 @@ export const IPC_CHANNELS = {
   },
   EXCEL: {
     PARSE_SPLIT_DOCUMENTS: 'excel:parse-split-documents',
+    START_SPLIT_JOB: 'excel:start-split-job',
   },
   JOB: {
     CANCEL_ACTIVE: 'job:cancel-active',
+    SKIP_CURRENT_FILE: 'job:skip-current-file',
     EVENT: 'job:event',
   },
 } as const;

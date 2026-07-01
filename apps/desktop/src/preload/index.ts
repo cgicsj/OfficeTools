@@ -21,9 +21,11 @@ const officeToolsApi: OfficeToolsApi = {
   excel: {
     parseSplitDocuments: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.EXCEL.PARSE_SPLIT_DOCUMENTS, input),
+    startSplitJob: (input) => ipcRenderer.invoke(IPC_CHANNELS.EXCEL.START_SPLIT_JOB, input),
   },
   jobs: {
     cancelActiveJob: () => ipcRenderer.invoke(IPC_CHANNELS.JOB.CANCEL_ACTIVE),
+    skipCurrentFile: () => ipcRenderer.invoke(IPC_CHANNELS.JOB.SKIP_CURRENT_FILE),
     onJobEvent: (listener: (event: JobEvent) => void) => {
       const handler = (_event: IpcRendererEvent, payload: JobEvent): void => {
         listener(payload);

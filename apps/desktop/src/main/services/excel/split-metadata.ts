@@ -76,10 +76,7 @@ const parseXlsxWorkbook = async (sourceId: string, filePath: string): Promise<Pa
   };
 };
 
-const readSheetJsCellText = (worksheet: XLSX.WorkSheet, rowIndex: number, columnIndex: number): string => {
-  const address = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex });
-  const cell = worksheet[address] as XLSX.CellObject | undefined;
-
+const readSheetJsCellDisplayText = (cell: XLSX.CellObject | undefined): string => {
   if (!cell) {
     return '';
   }
@@ -93,6 +90,42 @@ const readSheetJsCellText = (worksheet: XLSX.WorkSheet, rowIndex: number, column
   }
 
   return String(cell.v);
+};
+
+const findMergedMasterCell = (
+  worksheet: XLSX.WorkSheet,
+  rowIndex: number,
+  columnIndex: number,
+): XLSX.CellObject | undefined => {
+  const mergeRanges = worksheet['!merges'];
+  if (!mergeRanges) {
+    return undefined;
+  }
+
+  const mergeRange = mergeRanges.find((candidateRange) => {
+    return rowIndex >= candidateRange.s.r &&
+      rowIndex <= candidateRange.e.r &&
+      columnIndex >= candidateRange.s.c &&
+      columnIndex <= candidateRange.e.c;
+  });
+
+  if (!mergeRange) {
+    return undefined;
+  }
+
+  const masterAddress = XLSX.utils.encode_cell({ r: mergeRange.s.r, c: mergeRange.s.c });
+  return worksheet[masterAddress] as XLSX.CellObject | undefined;
+};
+
+const readSheetJsCellText = (worksheet: XLSX.WorkSheet, rowIndex: number, columnIndex: number): string => {
+  const address = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex });
+  const cell = worksheet[address] as XLSX.CellObject | undefined;
+  const directText = readSheetJsCellDisplayText(cell);
+  if (directText !== '') {
+    return directText;
+  }
+
+  return readSheetJsCellDisplayText(findMergedMasterCell(worksheet, rowIndex, columnIndex));
 };
 
 const readSheetJsSheet = (sheetName: string, worksheet: XLSX.WorkSheet): ParsedWorkbookSheet => {

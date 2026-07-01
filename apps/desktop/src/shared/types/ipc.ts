@@ -1,5 +1,10 @@
 import type { ApiResult } from './api';
-import type { ParseSplitDocumentsInput, ParseSplitDocumentsResult } from './excel';
+import type {
+  ParseSplitDocumentsInput,
+  ParseSplitDocumentsResult,
+  SplitJobResult,
+  StartSplitJobInput,
+} from './excel';
 import type { SelectedFile, SelectedFolder } from './files';
 import type { JobEvent } from './jobs';
 import type { OpenDirectoryInput } from './paths';
@@ -21,9 +26,11 @@ export type OfficeToolsApi = {
     parseSplitDocuments: (
       input: ParseSplitDocumentsInput,
     ) => Promise<ApiResult<ParseSplitDocumentsResult>>;
+    startSplitJob: (input: StartSplitJobInput) => Promise<ApiResult<SplitJobResult>>;
   };
   jobs: {
     cancelActiveJob: () => Promise<ApiResult<void>>;
+    skipCurrentFile: () => Promise<ApiResult<void>>;
     onJobEvent: (listener: (event: JobEvent) => void) => () => void;
   };
 };

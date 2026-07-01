@@ -46,10 +46,14 @@ Future file-processing jobs should keep temporary intermediates in this workspac
 
 ## Cancellation
 
-`job-cancellation.ts` stores one active `AbortController` at module scope. New long-running jobs should:
+`job-cancellation.ts` stores one active `AbortController` and one skip-current-file flag at module scope. New long-running jobs should:
 
 - Create an `AbortController` when work starts.
 - Call `setActiveJobAbortController(controller)`.
 - Pass `controller.signal` through processing functions.
 - Clear the active controller when the job ends.
 - Check `signal.aborted` at expensive or repeated steps.
+- Use `requestSkipCurrentFile()` only for workflows that can continue after the current file.
+- Call `consumeSkipCurrentFileRequest()` at file boundaries or row/group loops so skip-current does not leak into the next file.
+
+Cancel-all aborts the whole job and should clean the temp workspace without producing final output. Skip-current is best-effort while file I/O is in progress; the service must check the flag before repeated expensive work and before starting later output groups.

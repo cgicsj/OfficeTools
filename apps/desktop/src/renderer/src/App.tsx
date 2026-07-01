@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ParsedWorkbook } from '@shared/types/excel';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ParsedWorkbook, StartSplitJobInput } from '@shared/types/excel';
 import type { FileListItem, SelectedFile, SelectedFolder } from '@shared/types/files';
 import type { JobProgress, LogEntry, WorkflowTab } from '@shared/types/jobs';
 import { APP_CONFIG } from '@shared/constants/config';
@@ -38,6 +38,16 @@ const toFileListItems = (files: SelectedFile[]): FileListItem[] => {
   }));
 };
 
+const supportedExcelExtensions = new Set<string>(APP_CONFIG.SUPPORTED_EXCEL_EXTENSIONS);
+
+const isSupportedExcelFile = (file: SelectedFile): boolean => {
+  return supportedExcelExtensions.has(file.extension.toLowerCase());
+};
+
+const isWithinFileSizeLimit = (file: SelectedFile): boolean => {
+  return file.sizeBytes <= APP_CONFIG.LIMITS.MAX_FILE_SIZE_BYTES;
+};
+
 const getUnknownErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -64,7 +74,6 @@ export const App = (): JSX.Element => {
   const [busyTab, setBusyTab] = useState<WorkflowTab | null>(null);
   const [completionDialog, setCompletionDialog] = useState<CompletionDialogState | null>(null);
   const [cancelChoiceTab, setCancelChoiceTab] = useState<WorkflowTab | null>(null);
-  const splitCompletionTimerRef = useRef<number | null>(null);
 
   const appendLog = useCallback((tab: WorkflowTab, level: LogEntry['level'], message: string): void => {
     setLogs((currentLogs) => ({
@@ -73,18 +82,6 @@ export const App = (): JSX.Element => {
     }));
   }, []);
 
-  const clearSplitCompletionTimer = useCallback((): void => {
-    if (splitCompletionTimerRef.current !== null) {
-      window.clearTimeout(splitCompletionTimerRef.current);
-      splitCompletionTimerRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      clearSplitCompletionTimer();
-    };
-  }, [clearSplitCompletionTimer]);
 
   useEffect(() => {
     const loadOutputDirectory = async (): Promise<void> => {
@@ -101,6 +98,58 @@ export const App = (): JSX.Element => {
     };
 
     void loadOutputDirectory();
+  }, []);
+
+
+  useEffect(() => {
+    return window.officeTools.jobs.onJobEvent((event) => {
+      if (event.type === 'log') {
+        setLogs((currentLogs) => ({
+          ...currentLogs,
+          [event.entry.tab]: [...currentLogs[event.entry.tab], event.entry],
+        }));
+        return;
+      }
+
+      if (event.type === 'progress') {
+        if (event.tab === 'split') {
+          setSplitProgress(event.progress);
+          return;
+        }
+
+        setMergeProgress(event.progress);
+        return;
+      }
+
+      if (event.tab === 'split') {
+        setSplitFiles((currentFiles) =>
+          currentFiles.map((file) => {
+            if (file.sourceId !== event.sourceId) {
+              return file;
+            }
+
+            return {
+              ...file,
+              status: event.status,
+            };
+          }),
+        );
+        return;
+      }
+
+      setMergeFiles((currentFiles) =>
+        currentFiles.map((file) => {
+          if (file.sourceId !== event.sourceId) {
+            return file;
+          }
+
+          return {
+            ...file,
+            status: event.status,
+          };
+        }),
+      );
+    });
   }, []);
 
   const selectedLogs = useMemo(() => logs[activeTab], [activeTab, logs]);
@@ -138,7 +187,26 @@ export const App = (): JSX.Element => {
       return;
     }
 
-    const nextFiles = toFileListItems(result.data).slice(0, APP_CONFIG.LIMITS.MAX_FILES);
+    const unsupportedFiles = result.data.filter((file) => !isSupportedExcelFile(file));
+    const oversizedFiles = result.data.filter((file) => isSupportedExcelFile(file) && !isWithinFileSizeLimit(file));
+    const validFiles = result.data.filter((file) => isSupportedExcelFile(file) && isWithinFileSizeLimit(file));
+    const nextFiles = toFileListItems(validFiles.slice(0, APP_CONFIG.LIMITS.MAX_FILES));
+
+    unsupportedFiles.forEach((file) => {
+      appendLog('split', 'warning', `${file.name} 类型不支持，已排除`);
+    });
+    oversizedFiles.forEach((file) => {
+      appendLog('split', 'warning', `${file.name} 超过 10 MB，已排除`);
+    });
+    if (validFiles.length > APP_CONFIG.LIMITS.MAX_FILES) {
+      appendLog('split', 'warning', `最多支持 ${APP_CONFIG.LIMITS.MAX_FILES} 个文件，已保留前 ${APP_CONFIG.LIMITS.MAX_FILES} 个`);
+    }
+
+    if (nextFiles.length === 0) {
+      appendLog('split', 'error', '没有符合条件的 Excel 文件');
+      return;
+    }
+
     setSplitFiles(nextFiles);
     setSplitParsedWorkbooks([]);
     setSplitSettings({});
@@ -370,72 +438,92 @@ export const App = (): JSX.Element => {
     }
   }, [appendLog]);
 
-  const finishSplitJob = useCallback((): void => {
-    clearSplitCompletionTimer();
-    setSplitFiles((currentFiles) =>
-      currentFiles.map((file) => {
-        if (file.status === 'pending' || file.status === 'processing') {
-          return {
-            ...file,
-            status: 'completed',
-          };
-        }
-
-        return file;
-      }),
-    );
-    setSplitProgress({
-      stage: 'completed',
-      currentFileIndex: splitFiles.length,
-      totalFiles: splitFiles.length,
-      message: '拆分完成',
-    });
-    appendLog('split', 'success', `拆分完成，输出目录：${outputDirectory || '-'}`);
-    setBusyTab(null);
-    setCompletionDialog({
-      outputDirectory,
-      tab: 'split',
-    });
-  }, [appendLog, clearSplitCompletionTimer, outputDirectory, splitFiles.length]);
-
-  const startSplit = useCallback((): void => {
+  const startSplit = useCallback(async (): Promise<void> => {
     if (splitFiles.length === 0 || splitParsedWorkbooks.length === 0) {
       return;
     }
 
-    const firstProcessableIndex = splitFiles.findIndex((file) => file.status !== 'failed');
-    const currentFile = firstProcessableIndex >= 0 ? splitFiles[firstProcessableIndex] : undefined;
-    if (!currentFile) {
+    if (outputDirectory === '') {
+      appendLog('split', 'error', '请先选择保存路径');
       return;
     }
 
-    clearSplitCompletionTimer();
+    const jobFiles: StartSplitJobInput['files'] = splitParsedWorkbooks.flatMap((workbook) => {
+      const currentSettings = splitSettings[workbook.sourceId];
+      if (!currentSettings) {
+        return [];
+      }
+
+      const fieldRow = Number(currentSettings.fieldRow);
+      const splitColumn = Number(currentSettings.splitColumn);
+      if (!Number.isInteger(fieldRow) || !Number.isInteger(splitColumn)) {
+        return [];
+      }
+
+      return [{
+        fieldRow,
+        sheetName: currentSettings.sheetName,
+        sourceId: workbook.sourceId,
+        splitColumn,
+      }];
+    });
+
+    if (jobFiles.length === 0) {
+      appendLog('split', 'error', '没有可拆分的文件配置');
+      return;
+    }
+
+    setCancelChoiceTab(null);
     setBusyTab('split');
     setSplitFiles((currentFiles) =>
-      currentFiles.map((file, index) => {
-        if (file.status === 'failed') {
-          return file;
-        }
-
-        return {
-          ...file,
-          status: index === firstProcessableIndex ? 'processing' : 'pending',
-        };
-      }),
+      currentFiles.map((file) => ({
+        ...file,
+        status: jobFiles.some((jobFile) => jobFile.sourceId === file.sourceId) ? 'pending' : file.status,
+      })),
     );
     setSplitProgress({
+      currentFileIndex: 0,
+      message: '准备拆分',
       stage: 'processing',
-      currentFileIndex: firstProcessableIndex + 1,
-      totalFiles: splitFiles.length,
-      currentFileName: currentFile.name,
-      message: '正在处理',
+      totalFiles: jobFiles.length,
     });
-    appendLog('split', 'info', `正在处理 ${currentFile.name}`);
 
-    splitCompletionTimerRef.current = window.setTimeout(() => {
-      finishSplitJob();
-    }, 900);
-  }, [appendLog, clearSplitCompletionTimer, finishSplitJob, splitFiles, splitParsedWorkbooks.length]);
+    try {
+      const result = await window.officeTools.excel.startSplitJob({
+        files: jobFiles,
+        outputDirectory,
+      });
+
+      if (result.success === false) {
+        if (result.code !== 'JOB_CANCELED') {
+          setSplitProgress({
+            ...idleProgress,
+            stage: 'failed',
+            totalFiles: jobFiles.length,
+            message: '拆分失败',
+          });
+          appendLog('split', 'error', result.error);
+        }
+        return;
+      }
+
+      setCompletionDialog({
+        outputDirectory: result.data.outputDirectory,
+        tab: 'split',
+      });
+    } catch (error) {
+      setSplitProgress({
+        ...idleProgress,
+        stage: 'failed',
+        totalFiles: jobFiles.length,
+        message: '拆分失败',
+      });
+      appendLog('split', 'error', getUnknownErrorMessage(error));
+    } finally {
+      setBusyTab(null);
+      setCancelChoiceTab(null);
+    }
+  }, [appendLog, outputDirectory, splitFiles.length, splitParsedWorkbooks, splitSettings]);
 
   const startMerge = useCallback((): void => {
     if (!mergeFolder) {
@@ -456,7 +544,6 @@ export const App = (): JSX.Element => {
   const cancelAllTasks = useCallback(
     async (targetTab: WorkflowTab | null = null): Promise<void> => {
       const tabToCancel = targetTab ?? cancelChoiceTab ?? busyTab ?? activeTab;
-      clearSplitCompletionTimer();
       setCancelChoiceTab(null);
 
       const result = await window.officeTools.jobs.cancelActiveJob();
@@ -493,20 +580,12 @@ export const App = (): JSX.Element => {
           totalFiles: mergeFiles.length,
           message: '用户已取消',
         });
+        appendLog(tabToCancel, 'warning', '用户已取消所有任务');
       }
 
-      appendLog(tabToCancel, 'warning', '用户已取消所有任务');
       setBusyTab(null);
     },
-    [
-      activeTab,
-      appendLog,
-      busyTab,
-      cancelChoiceTab,
-      clearSplitCompletionTimer,
-      mergeFiles.length,
-      splitFiles.length,
-    ],
+    [activeTab, appendLog, busyTab, cancelChoiceTab, mergeFiles.length, splitFiles.length],
   );
 
   const requestCancelJob = useCallback((): void => {
@@ -522,33 +601,27 @@ export const App = (): JSX.Element => {
     void cancelAllTasks(busyTab);
   }, [busyTab, cancelAllTasks]);
 
-  const skipCurrentFile = useCallback((): void => {
+  const skipCurrentFile = useCallback(async (): Promise<void> => {
     if (cancelChoiceTab !== 'split') {
       return;
     }
 
     const currentFile = splitFiles.find((file) => file.status === 'processing');
-    clearSplitCompletionTimer();
     setCancelChoiceTab(null);
 
-    if (currentFile) {
-      setSplitFiles((currentFiles) =>
-        currentFiles.map((file) => {
-          if (file.sourceId === currentFile.sourceId) {
-            return {
-              ...file,
-              status: 'skipped',
-            };
-          }
-
-          return file;
-        }),
-      );
-      appendLog('split', 'warning', `已跳过当前文件 ${currentFile.name}`);
+    if (!currentFile) {
+      appendLog('split', 'warning', '当前没有正在处理的文件');
+      return;
     }
 
-    finishSplitJob();
-  }, [appendLog, cancelChoiceTab, clearSplitCompletionTimer, finishSplitJob, splitFiles]);
+    const result = await window.officeTools.jobs.skipCurrentFile();
+    if (result.success === false) {
+      appendLog('split', 'error', result.error);
+      return;
+    }
+
+    appendLog('split', 'warning', `正在跳过当前文件 ${currentFile.name}`);
+  }, [appendLog, cancelChoiceTab, splitFiles]);
 
   const dismissCompletionDialog = useCallback((): void => {
     setCompletionDialog(null);
