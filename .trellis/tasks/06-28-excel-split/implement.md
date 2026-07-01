@@ -38,7 +38,7 @@ If output style preservation regresses, isolate the writer change and fall back 
 - Real split jobs now run in the main process through typed IPC instead of the previous renderer-side completion simulation.
 - `.xlsx` files split through `exceljs`; `.xls` and `.et` files split directly through SheetJS CE without WPS conversion.
 - The final output is `总拆分结果.zip` in the selected output directory, with one folder per input file and duplicate names suffixed.
-- Selected-sheet embedded object rejection is implemented for `.xlsx` relationship files. Representative `.xls` / `.et` samples are still required to validate direct-reader fidelity and any object-detection limits for those legacy/WPS formats.
+- Selected-sheet embedded object rejection is implemented for `.xlsx` relationship files and direct `.xls` / `.et` files. ZIP-like `.et` files use worksheet relationship inspection; CFB/BIFF files scan the selected sheet substream for object/drawing records and fail closed when object ownership cannot be confirmed. Representative `.xls` / `.et` samples are still required to validate direct-reader fidelity.
 
 ## Validation Run
 

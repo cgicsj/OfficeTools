@@ -9,6 +9,7 @@ Reference files and artifacts:
 - `.trellis/tasks/06-28-office-tools-phase1/design.md`
 - `apps/desktop/src/main/services/workspace/temp-workspace.ts`
 - `apps/desktop/src/main/services/file-selection/file-registry.ts`
+- `apps/desktop/src/main/services/excel/legacy-object-detector.ts`
 
 ## Scenario: Workbook Adapters And Direct Readers
 
@@ -58,7 +59,7 @@ The exact type names may evolve, but the responsibilities should stay separate.
 - Output files are always `.xlsx`.
 - Temporary processing files belong under a per-job temp workspace and must be cleaned after success, failure, or cancellation.
 - Formula output uses cached calculated results. If a formula cell has no cached result, the feature must warn/skip rather than pretending it has a calculated display value.
-- Selected-sheet object detection checks only the selected worksheet where possible. Non-selected sheets with object relationships do not block processing.
+- Selected-sheet object detection checks only the selected worksheet where possible. Non-selected sheets with object relationships do not block processing. Direct `.xls` / `.et` files only need blocking detection, not object preservation: ZIP-like files use worksheet relationship inspection, CFB/BIFF files scan the selected sheet BIFF substream for object/drawing records, and uncertain ownership fails closed.
 
 ### 4. Validation & Error Matrix
 
@@ -70,6 +71,8 @@ The exact type names may evolve, but the responsibilities should stay separate.
 | Direct `.xls` or `.et` reader lacks required metadata in validation samples | Narrow that format support contract before split/merge implementation proceeds. |
 | `exceljs` cannot open workbook | Mark file failed/skipped with a user-facing log. |
 | Selected sheet has drawing/vml/ole/control relationship | Block that file as unsupported. |
+| Direct `.xls` / `.et` selected sheet contains OBJ, IMDATA, MSODRAWING, MSODRAWINGSELECTION, or text-object records | Block that file as unsupported. |
+| Direct `.xls` / `.et` object ownership cannot be mapped to the selected sheet | Fail closed and ask the user to save as `.xlsx`. |
 | Non-selected sheet has object relationship only | Continue processing selected sheet. |
 | Formula has cached result | Use cached result/display text. |
 | Formula has no cached result | Warn or skip according to task PRD; do not output the formula string as the display value. |
@@ -80,6 +83,8 @@ The exact type names may evolve, but the responsibilities should stay separate.
 - Good: `.xlsx` with styles, widths, heights, merges, hidden rows/columns, number formats, and cached formula results round-trips through `exceljs` copy logic.
 - Base: `.xlsx` with no embedded object relationships on the selected sheet processes normally.
 - Bad: selected worksheet `.rels` contains a drawing relationship; the file is blocked before output generation.
+- Bad: selected `.xls` / `.et` BIFF sheet substream contains legacy object/drawing records; the file is blocked before output generation.
+- Bad: a CFB workbook has object storage that cannot be mapped to a selected sheet; the file is blocked with a save-as-`.xlsx` message.
 - Good: representative `.xls` and `.et` samples expose sheet names, display rows, merge metadata, format metadata, and hidden row/column metadata through the direct reader.
 - Bad: a text file renamed to `.xls` or `.et` is rejected by container preflight instead of being accepted as a one-cell SheetJS workbook.
 - Bad: `.xls` or `.et` direct reading fails; the app asks the user to manually convert to `.xlsx` and skips that file.
@@ -100,6 +105,7 @@ Assertions to preserve in automated or manual checks:
 - cached formula result is used instead of formula text;
 - missing formula result is surfaced as a limitation;
 - selected-sheet object relationship blocks the file;
+- direct `.xls` / `.et` legacy object records block the file, and uncertain ownership fails closed;
 - SheetJS direct reading opens representative `.xls` and `.et` samples and exposes required metadata, or the relevant support contract is narrowed before split/merge implementation proceeds.
 - Malformed/text-like `.xls` and `.et` inputs are rejected before SheetJS generic text fallback can turn them into single-sheet workbooks.
 
@@ -220,7 +226,7 @@ Manual or automated sample assertions must cover:
 - styled/date/long-number `.xlsx` split;
 - direct `.xls` split when representative samples exist;
 - direct `.et` split when representative samples exist;
-- selected-sheet object rejection;
+- selected-sheet object rejection for `.xlsx` and direct `.xls` / `.et` legacy object records;
 - cancel-all cleanup and no zip output;
 - duplicate source-name folder suffixes and duplicate split-value filename suffixes.
 

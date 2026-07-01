@@ -13,6 +13,7 @@ import type {
   StartSplitJobInput,
 } from '../../../shared/types/excel';
 import type { JobEvent, JobProgress, LogEntry, WorkflowTab } from '../../../shared/types/jobs';
+import { assertNoUnsupportedObjectsInDirectWorkbook } from './legacy-object-detector';
 import { getRegisteredFilePath } from '../file-selection/file-registry';
 import {
   consumeSkipCurrentFileRequest,
@@ -573,6 +574,9 @@ const processSheetJsFile = async (
   if (!worksheet) {
     throw new Error(`找不到 sheet：${input.sheetName}`);
   }
+
+  await assertNoUnsupportedObjectsInDirectWorkbook(sourcePath, input.sheetName, workbook.SheetNames);
+  throwIfInterrupted(context);
 
   const reference = worksheet['!ref'];
   if (!reference) {
