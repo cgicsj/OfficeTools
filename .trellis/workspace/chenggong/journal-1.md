@@ -70,3 +70,35 @@ Rewrote Trellis specs from the actual OfficeTools Electron Forge/Vite/React code
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Implement Excel split job
+
+**Date**: 2026-07-01
+**Task**: Implement Excel split job
+
+### Summary
+
+Implemented the real Excel split job flow: typed IPC, main-process split writer for xlsx/xls/et without WPS conversion, zip output, job events, cancel/skip controls, split column labeling, and related specs. Validation passed: pnpm lint, pnpm typecheck, pnpm build, pnpm probe:excel. Representative xls/et sample acceptance remains pending.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cd68e19` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
