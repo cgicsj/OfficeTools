@@ -18,22 +18,41 @@ Do not start the parent task for implementation unless parent-only integration w
 
 ## Implementation Checklist
 
-- [ ] Scaffold the Electron + React + TypeScript application.
-- [ ] Define IPC contracts and shared job/log types.
-- [ ] Implement app shell, two tabs, independent logs, file list states, progress, and cancellation plumbing.
-- [ ] Validate direct `.xls` library reading with representative `.xls` samples.
-- [ ] Validate direct `.et` library reading with representative `.et` samples.
-- [ ] Validate Excel adapter capabilities for style, merged cells, hidden rows/columns, number formats, display values, and object detection.
-- [ ] Implement split parsing and per-file configuration flow.
-- [ ] Implement split output generation and final zip structure.
-- [ ] Implement merge folder scan and per-file sheet selection flow.
-- [ ] Implement one-sheet and multi-sheet merge modes.
-- [ ] Implement output directory handling, Downloads default, and automatic rename on conflict.
-- [ ] Package as `.deb` for ARM64 and run target installation validation.
+- [x] Scaffold the Electron + React + TypeScript application.
+- [x] Define IPC contracts and shared job/log types.
+- [x] Implement app shell, two tabs, independent logs, file list states, progress, and cancellation plumbing.
+- [ ] Validate direct `.xls` library reading with representative `.xls` samples. (Representative sample acceptance skipped this pass per user instruction; direct-reader probe and malformed-input checks pass.)
+- [ ] Validate direct `.et` library reading with representative `.et` samples. (Representative sample acceptance skipped this pass per user instruction; direct-reader probe and malformed-input checks pass.)
+- [x] Validate Excel adapter capabilities for style, merged cells, hidden rows/columns, number formats, display values, and object detection.
+- [x] Implement split parsing and per-file configuration flow.
+- [x] Implement split output generation and final zip structure.
+- [x] Implement merge folder scan and per-file sheet selection flow.
+- [x] Implement one-sheet and multi-sheet merge modes.
+- [x] Implement output directory handling, Downloads default, and automatic rename on conflict.
+- [x] Package as `.deb` for ARM64.
+- [ ] Run target installation validation. (Skipped this pass per user instruction.)
+
+## Completion Summary
+
+- Electron + React + TypeScript desktop app is implemented with the Phase 1 `表格拆分` and `表格合并` tabs.
+- Excel split and merge workflows use direct `.xls` / `.et` reader paths without WPS conversion and block selected-sheet embedded objects.
+- ARM64 Debian packaging is configured and produced `apps/desktop/out/make/deb/arm64/office-tools_0.1.0_arm64.deb`.
+- `dpkg-deb --info` confirms `Package: office-tools` and `Architecture: arm64`.
+- Automated validation run this pass: `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm probe:excel`, `pnpm make:deb:arm64`.
+- Focused tests, representative `.xls` / `.et` sample acceptance, UOS install/launch smoke tests, and manual split/merge sample acceptance were skipped per user instruction.
 
 ## Validation Commands
 
-Exact commands will be defined after the scaffold exists. Expected command categories:
+Implemented validation commands used for this completion pass:
+
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm build`
+- `pnpm probe:excel`
+- `pnpm make:deb:arm64`
+- `dpkg-deb --info apps/desktop/out/make/deb/arm64/office-tools_0.1.0_arm64.deb`
+
+Original expected command categories:
 
 - dependency installation;
 - type check;
