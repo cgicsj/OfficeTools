@@ -2,24 +2,32 @@
 
 ## Checklist
 
-- [ ] Implement folder selection and scanning.
-- [ ] Implement type/size filtering and numbered file list.
-- [ ] Implement per-file sheet selection.
-- [ ] Implement selected-sheet unsupported-object rejection.
-- [ ] Implement merge mode selection.
-- [ ] Implement field-name row selection for one-sheet mode.
-- [ ] Implement header display-value comparison.
-- [ ] Implement one-sheet writer for matching headers.
-- [ ] Implement one-sheet writer for differing headers and warning dialog.
-- [ ] Implement multi-sheet writer.
-- [ ] Implement sheet-name truncation and duplicate resolution.
-- [ ] Implement output directory/default Downloads handling.
-- [ ] Implement output conflict automatic rename.
-- [ ] Implement cancellation cleanup.
-- [ ] Add focused tests for header comparison, sheet-name policy, and output filename policy.
-- [ ] Run sample workbook manual acceptance.
+- [x] Implement folder selection and scanning.
+- [x] Implement type/size filtering and numbered file list.
+- [x] Implement per-file sheet selection.
+- [x] Implement selected-sheet unsupported-object rejection.
+- [x] Implement merge mode selection.
+- [x] Implement field-name row selection for one-sheet mode.
+- [x] Implement header display-value comparison.
+- [x] Implement one-sheet writer for matching headers.
+- [x] Implement one-sheet writer for differing headers and warning dialog.
+- [x] Implement multi-sheet writer.
+- [x] Implement sheet-name truncation and duplicate resolution.
+- [x] Implement output directory/default Downloads handling.
+- [x] Implement output conflict automatic rename.
+- [x] Implement cancellation cleanup.
+- [ ] Add focused tests for header comparison, sheet-name policy, and output filename policy. (Skipped this pass per user instruction.)
+- [ ] Run sample workbook manual acceptance. (Skipped this pass per user instruction.)
 
 ## Validation
+
+- [x] `pnpm lint`
+- [x] `pnpm typecheck`
+- [x] `pnpm build`
+- [x] `pnpm probe:excel`
+- [ ] Focused tests and sample workbook manual acceptance were deferred per user instruction.
+
+## Functional Validation Targets
 
 - Type-check, lint, and tests.
 - Merge normal `.xlsx` files into one sheet.

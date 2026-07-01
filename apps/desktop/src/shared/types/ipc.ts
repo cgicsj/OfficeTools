@@ -1,8 +1,12 @@
 import type { ApiResult } from './api';
 import type {
+  MergeJobResult,
+  ParseMergeFolderInput,
+  ParseMergeFolderResult,
   ParseSplitDocumentsInput,
   ParseSplitDocumentsResult,
   SplitJobResult,
+  StartMergeJobInput,
   StartSplitJobInput,
 } from './excel';
 import type { SelectedFile, SelectedFolder } from './files';
@@ -27,6 +31,8 @@ export type OfficeToolsApi = {
       input: ParseSplitDocumentsInput,
     ) => Promise<ApiResult<ParseSplitDocumentsResult>>;
     startSplitJob: (input: StartSplitJobInput) => Promise<ApiResult<SplitJobResult>>;
+    parseMergeFolder: (input: ParseMergeFolderInput) => Promise<ApiResult<ParseMergeFolderResult>>;
+    startMergeJob: (input: StartMergeJobInput) => Promise<ApiResult<MergeJobResult>>;
   };
   jobs: {
     cancelActiveJob: () => Promise<ApiResult<void>>;

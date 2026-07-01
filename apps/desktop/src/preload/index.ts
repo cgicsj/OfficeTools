@@ -22,6 +22,8 @@ const officeToolsApi: OfficeToolsApi = {
     parseSplitDocuments: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.EXCEL.PARSE_SPLIT_DOCUMENTS, input),
     startSplitJob: (input) => ipcRenderer.invoke(IPC_CHANNELS.EXCEL.START_SPLIT_JOB, input),
+    parseMergeFolder: (input) => ipcRenderer.invoke(IPC_CHANNELS.EXCEL.PARSE_MERGE_FOLDER, input),
+    startMergeJob: (input) => ipcRenderer.invoke(IPC_CHANNELS.EXCEL.START_MERGE_JOB, input),
   },
   jobs: {
     cancelActiveJob: () => ipcRenderer.invoke(IPC_CHANNELS.JOB.CANCEL_ACTIVE),

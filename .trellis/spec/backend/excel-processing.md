@@ -253,6 +253,116 @@ const result = await window.officeTools.excel.startSplitJob({
 const outputFolderPath = path.join(workspace.rootPath, sourceId);
 ```
 
+
+## Scenario: Merge Job Output Generation
+
+### 1. Scope / Trigger
+
+Use this spec when implementing or changing the production merge workflow from folder scan through output workbook generation. This is a cross-layer contract because it changes shared Zod input, preload API, IPC handler behavior, job events, filesystem output, and renderer state.
+
+### 2. Signatures
+
+Current shared contracts live in `apps/desktop/src/shared/types/excel.ts`:
+
+```typescript
+const parseMergeFolderInputSchema = z.object({
+  folderSourceId: z.string().min(1),
+});
+
+const startMergeJobInputSchema = z.object({
+  outputDirectory: z.string().min(1),
+  mode: z.enum(['single-sheet', 'multi-sheet']),
+  fieldRow: z.number().int().min(1).max(10),
+  files: z.array(z.object({
+    sourceId: z.string().min(1),
+    sheetName: z.string().min(1),
+  })).min(1),
+});
+```
+
+The preload API is `window.officeTools.excel.parseMergeFolder(input)` and `window.officeTools.excel.startMergeJob(input)`. The IPC channels are `IPC_CHANNELS.EXCEL.PARSE_MERGE_FOLDER` and `IPC_CHANNELS.EXCEL.START_MERGE_JOB`.
+
+### 3. Contracts
+
+- Renderer stores selected folder and file metadata by `sourceId`; main-process services resolve real paths through the registry.
+- Folder scan recursively keeps `.xls`, `.xlsx`, and `.et` files, excludes files over 10 MB, caps to `APP_CONFIG.LIMITS.MAX_FILES`, registers eligible files, and parses workbook metadata.
+- `.xlsx` merge input uses `exceljs`; `.xls` and `.et` merge input uses SheetJS CE direct reading without WPS conversion.
+- Direct `.xls` / `.et` merge input preflights the file container signature before accepting SheetJS output.
+- Selected-sheet unsupported-object rejection blocks only the selected sheet where ownership can be determined. Direct `.xls` / `.et` object detection is blocking only and does not preserve embedded objects.
+- One-sheet merge treats rows `1..fieldRow` as the title area and rows after `fieldRow` as data rows. Empty rows between data rows are copied because row numbers are preserved when later rows exist.
+- One-sheet merge compares field-row display values after trimming and ignoring trailing empty columns. If all headers match, only the first file contributes title rows; later files contribute data rows only.
+- If any selected header differs, every valid file contributes its title area and data rows, and the job emits/returns `选择的文件具有标题行内容不一致，已保留标题行追加合并。`.
+- One-sheet merge uses the first valid file's column metadata. Row/cell values, cached formula results, row height/hidden/outline metadata, cell number formats, and available styles are copied into the output workbook.
+- Multi-sheet merge creates one output sheet per valid source file, using the source filename base as the sheet name. Names are sanitized, truncated to 31 characters, and de-duplicated with numeric suffixes.
+- Merge output writes a single `.xlsx` workbook named `汇总数据.xlsx`; existing files get numeric suffixes.
+- Final output is written through a per-job temp workspace first, then copied to the selected output directory only after the job has not been canceled.
+- Job progress, logs, and per-file status changes are emitted through `IPC_CHANNELS.JOB.EVENT` with `tab: 'merge'`.
+
+### 4. Validation & Error Matrix
+
+| Condition | Expected Behavior |
+| --- | --- |
+| Invalid merge folder parse payload | `ApiResult` failure with `INVALID_MERGE_PARSE_INPUT`. |
+| Invalid merge job payload | `ApiResult` failure with `INVALID_MERGE_JOB_INPUT`. |
+| Folder source ID no longer resolves | `ApiResult` failure with `MERGE_PARSE_FAILED`. |
+| File exceeds 10 MB during scan | Exclude it from configurable files and return an excluded-file warning. |
+| Direct `.xls` / `.et` metadata parse fails during scan | Return a parse failure so the renderer warns the user and skips the file. |
+| Source ID no longer resolves during merge | Mark that file failed and continue batch. |
+| Selected sheet missing | Mark that file failed and continue batch. |
+| Selected sheet has drawing/vml/ole/control relationship | Mark that file failed and continue batch. |
+| Formula cell has no cached result | Mark that file failed; do not output formula text. |
+| All files fail | Return `MERGE_JOB_FAILED` and produce no workbook. |
+| User cancels all | Abort remaining work, delete temp workspace, return `JOB_CANCELED`, and produce no final output. |
+
+### 5. Tests Required
+
+Before reporting merge changes complete, run:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm build
+pnpm probe:excel
+```
+
+Manual or automated sample assertions should cover:
+
+- normal `.xlsx` one-sheet merge with matching headers;
+- differing-header one-sheet merge and the required warning text;
+- empty rows preserved between copied data rows;
+- multi-sheet merge with filename-based sheet truncation and duplicate suffixes;
+- direct `.xls` merge when representative samples exist;
+- direct `.et` merge when representative samples exist;
+- selected-sheet object rejection for `.xlsx` and direct `.xls` / `.et` legacy object records;
+- cancel-all cleanup and no final workbook;
+- duplicate `汇总数据.xlsx` output suffixing.
+
+### 6. Wrong vs Correct
+
+#### Wrong
+
+```typescript
+// Renderer sends source paths or opens workbook data itself.
+await window.officeTools.excel.startMergeJob({ files: [{ path: '/home/user/source.xls' }] });
+
+// Legacy formats are routed through WPS conversion.
+await wpsConverter.convertXlsToXlsx(sourcePath, tempDir);
+
+// The final output path is written before cancellation is checked.
+await workbook.xlsx.writeFile(outputPath);
+```
+
+#### Correct
+
+```typescript
+const result = await window.officeTools.excel.startMergeJob({
+  outputDirectory,
+  mode: 'single-sheet',
+  fieldRow: 1,
+  files: [{ sourceId, sheetName }],
+});
+```
+
 ## Probe Harness
 
 The probe script is development tooling, not production UI. It writes:

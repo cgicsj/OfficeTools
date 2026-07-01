@@ -1,6 +1,13 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/constants/channels';
-import { parseSplitDocumentsInputSchema, startSplitJobInputSchema } from '../../shared/types/excel';
+import {
+  parseMergeFolderInputSchema,
+  parseSplitDocumentsInputSchema,
+  startMergeJobInputSchema,
+  startSplitJobInputSchema,
+} from '../../shared/types/excel';
+import { parseMergeFolder } from '../services/excel/merge-folder';
+import { isMergeJobCanceledError, runMergeJob } from '../services/excel/merge-job';
 import { runSplitJob, isSplitJobCanceledError } from '../services/excel/split-job';
 import { parseSplitDocumentMetadata } from '../services/excel/split-metadata';
 
@@ -17,6 +24,76 @@ export const setupExcelHandlers = (): void => {
 
     const result = await parseSplitDocumentMetadata(parsedInput.data.sourceIds);
     return { success: true, data: result };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.EXCEL.PARSE_MERGE_FOLDER, async (_event, input: unknown) => {
+    const parsedInput = parseMergeFolderInputSchema.safeParse(input);
+    if (parsedInput.success === false) {
+      return {
+        success: false,
+        error: 'Invalid merge folder parse input',
+        code: 'INVALID_MERGE_PARSE_INPUT',
+      };
+    }
+
+    try {
+      const result = await parseMergeFolder(parsedInput.data.folderSourceId);
+      return { success: true, data: result };
+    } catch (error) {
+      if (error instanceof Error && error.message) {
+        return {
+          success: false,
+          error: error.message,
+          code: 'MERGE_PARSE_FAILED',
+        };
+      }
+
+      return {
+        success: false,
+        error: '合并文件夹解析失败',
+        code: 'MERGE_PARSE_FAILED',
+      };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.EXCEL.START_MERGE_JOB, async (event, input: unknown) => {
+    const parsedInput = startMergeJobInputSchema.safeParse(input);
+    if (parsedInput.success === false) {
+      return {
+        success: false,
+        error: 'Invalid merge job input',
+        code: 'INVALID_MERGE_JOB_INPUT',
+      };
+    }
+
+    try {
+      const result = await runMergeJob(parsedInput.data, (jobEvent) => {
+        event.sender.send(IPC_CHANNELS.JOB.EVENT, jobEvent);
+      });
+      return { success: true, data: result };
+    } catch (error) {
+      if (isMergeJobCanceledError(error)) {
+        return {
+          success: false,
+          error: '用户已取消',
+          code: 'JOB_CANCELED',
+        };
+      }
+
+      if (error instanceof Error && error.message) {
+        return {
+          success: false,
+          error: error.message,
+          code: 'MERGE_JOB_FAILED',
+        };
+      }
+
+      return {
+        success: false,
+        error: '合并任务失败',
+        code: 'MERGE_JOB_FAILED',
+      };
+    }
   });
 
   ipcMain.handle(IPC_CHANNELS.EXCEL.START_SPLIT_JOB, async (event, input: unknown) => {

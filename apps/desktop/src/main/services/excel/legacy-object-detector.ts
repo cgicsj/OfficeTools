@@ -18,8 +18,11 @@ const LEGACY_OBJECT_RECORD_IDS = new Map<number, string>([
   [0x01b6, 'TXO'],
 ]);
 
-const UNSUPPORTED_OBJECT_MESSAGE = '所选 sheet 含有图片、图表或其他嵌入对象，暂不支持拆分';
 const UNCERTAIN_OBJECT_MESSAGE = '无法确认所选 sheet 是否含有嵌入对象，请另存为 .xlsx 后重试';
+
+const createUnsupportedObjectMessage = (operationName: string): string => {
+  return `所选 sheet 含有图片、图表或其他嵌入对象，暂不支持${operationName}`;
+};
 
 type CfbEntry = {
   content?: Uint8Array;
@@ -190,6 +193,7 @@ const assertNoZipSelectedSheetObjects = async (
   workbookBuffer: Buffer,
   selectedSheetName: string,
   workbookSheetNames: string[],
+  operationName: string,
 ): Promise<void> => {
   const sheetIndex = workbookSheetNames.indexOf(selectedSheetName);
   if (sheetIndex < 0) {
@@ -205,7 +209,7 @@ const assertNoZipSelectedSheetObjects = async (
   const relationshipText = await relationshipFile.async('string');
   const hasObjects = OBJECT_RELATIONSHIP_MARKERS.some((marker) => relationshipText.includes(marker));
   if (hasObjects) {
-    throw new Error(UNSUPPORTED_OBJECT_MESSAGE);
+    throw new Error(createUnsupportedObjectMessage(operationName));
   }
 };
 
@@ -213,6 +217,7 @@ const assertNoCfbSelectedSheetObjects = (
   workbookBuffer: Buffer,
   selectedSheetName: string,
   workbookSheetNames: string[],
+  operationName: string,
 ): void => {
   const cfb = XLSX.CFB.read(workbookBuffer, { type: 'buffer' }) as CfbContainer;
   const workbookStream = getWorkbookStream(cfb);
@@ -224,7 +229,7 @@ const assertNoCfbSelectedSheetObjects = (
   }
 
   if (selectedSheet.type !== 0x00) {
-    throw new Error(UNSUPPORTED_OBJECT_MESSAGE);
+    throw new Error(createUnsupportedObjectMessage(operationName));
   }
 
   if (selectedSheet.offset < 0 || selectedSheet.offset >= workbookStream.length) {
@@ -232,7 +237,7 @@ const assertNoCfbSelectedSheetObjects = (
   }
 
   if (hasLegacyObjectRecordInSheet(workbookStream, selectedSheet.offset)) {
-    throw new Error(UNSUPPORTED_OBJECT_MESSAGE);
+    throw new Error(createUnsupportedObjectMessage(operationName));
   }
 
   if (hasWorkbookLevelObjectStorage(cfb)) {
@@ -244,16 +249,17 @@ export const assertNoUnsupportedObjectsInDirectWorkbook = async (
   workbookPath: string,
   selectedSheetName: string,
   workbookSheetNames: string[],
+  operationName = '拆分',
 ): Promise<void> => {
   const workbookBuffer = await readFile(workbookPath);
 
   if (isZipContainer(workbookBuffer)) {
-    await assertNoZipSelectedSheetObjects(workbookBuffer, selectedSheetName, workbookSheetNames);
+    await assertNoZipSelectedSheetObjects(workbookBuffer, selectedSheetName, workbookSheetNames, operationName);
     return;
   }
 
   if (isCfbContainer(workbookBuffer)) {
-    assertNoCfbSelectedSheetObjects(workbookBuffer, selectedSheetName, workbookSheetNames);
+    assertNoCfbSelectedSheetObjects(workbookBuffer, selectedSheetName, workbookSheetNames, operationName);
     return;
   }
 

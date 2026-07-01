@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ParsedWorkbook, StartSplitJobInput } from '@shared/types/excel';
+import type { MergeMode, ParsedWorkbook, StartMergeJobInput, StartSplitJobInput } from '@shared/types/excel';
 import type { FileListItem, SelectedFile, SelectedFolder } from '@shared/types/files';
 import type { JobProgress, LogEntry, WorkflowTab } from '@shared/types/jobs';
 import { APP_CONFIG } from '@shared/constants/config';
@@ -8,6 +8,8 @@ import { ModalDialog } from './components/ui/ModalDialog';
 import { MergeWorkflow } from './components/workflows/MergeWorkflow';
 import { SplitWorkflow } from './components/workflows/SplitWorkflow';
 import { createLogEntry } from './lib/logs';
+import { createDefaultMergeSheetSelections, hasCompleteMergeSheetSelections } from './lib/merge-settings';
+import type { MergeSheetSelections } from './lib/merge-settings';
 import {
   createDefaultSplitSettings,
   createSettingsForFieldRow,
@@ -29,6 +31,7 @@ const idleProgress: JobProgress = {
 type CompletionDialogState = {
   outputDirectory: string;
   tab: WorkflowTab;
+  warning?: string;
 };
 
 const toFileListItems = (files: SelectedFile[]): FileListItem[] => {
@@ -48,6 +51,10 @@ const isWithinFileSizeLimit = (file: SelectedFile): boolean => {
   return file.sizeBytes <= APP_CONFIG.LIMITS.MAX_FILE_SIZE_BYTES;
 };
 
+const isMergeMode = (value: string): value is MergeMode => {
+  return value === 'single-sheet' || value === 'multi-sheet';
+};
+
 const getUnknownErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -64,6 +71,10 @@ export const App = (): JSX.Element => {
   const [splitSettings, setSplitSettings] = useState<Record<string, SplitSettingsState>>({});
   const [mergeFiles, setMergeFiles] = useState<FileListItem[]>([]);
   const [mergeFolder, setMergeFolder] = useState<SelectedFolder | null>(null);
+  const [mergeParsedWorkbooks, setMergeParsedWorkbooks] = useState<ParsedWorkbook[]>([]);
+  const [mergeMode, setMergeMode] = useState<MergeMode>('single-sheet');
+  const [mergeFieldRow, setMergeFieldRow] = useState('1');
+  const [mergeSheetSelections, setMergeSheetSelections] = useState<MergeSheetSelections>({});
   const [logs, setLogs] = useState<Record<WorkflowTab, LogEntry[]>>({
     split: [],
     merge: [],
@@ -430,13 +441,118 @@ export const App = (): JSX.Element => {
       return;
     }
 
-    setMergeFolder(result.data ?? null);
+    if (!result.data) {
+      return;
+    }
+
+    setMergeFolder(result.data);
     setMergeFiles([]);
-    setMergeProgress(idleProgress);
-    if (result.data) {
-      appendLog('merge', 'info', `已选择文件夹 ${result.data.name}`);
+    setMergeParsedWorkbooks([]);
+    setMergeSheetSelections({});
+    setBusyTab('merge');
+    setMergeProgress({
+      stage: 'parsing',
+      currentFileIndex: 0,
+      totalFiles: 0,
+      currentFileName: result.data.name,
+      message: '扫描文件夹',
+    });
+    appendLog('merge', 'info', `已选择文件夹 ${result.data.name}`);
+
+    try {
+      const parseResult = await window.officeTools.excel.parseMergeFolder({
+        folderSourceId: result.data.sourceId,
+      });
+
+      if (parseResult.success === false) {
+        setMergeProgress({
+          ...idleProgress,
+          stage: 'failed',
+          message: '扫描失败',
+        });
+        appendLog('merge', 'error', parseResult.error);
+        return;
+      }
+
+      parseResult.data.excludedFiles.forEach((file) => {
+        appendLog('merge', 'warning', `${file.fileName} ${file.reason}`);
+      });
+      parseResult.data.failures.forEach((failure) => {
+        appendLog('merge', 'warning', `${failure.fileName} 解析失败：${failure.error}`);
+      });
+
+      const nextFiles = toFileListItems(parseResult.data.files);
+      setMergeFiles(nextFiles);
+      setMergeParsedWorkbooks(parseResult.data.workbooks);
+      setMergeSheetSelections(createDefaultMergeSheetSelections(parseResult.data.workbooks));
+
+      if (parseResult.data.workbooks.length === 0) {
+        setMergeProgress({
+          ...idleProgress,
+          stage: 'failed',
+          totalFiles: nextFiles.length,
+          message: '没有可合并的文档',
+        });
+        appendLog('merge', 'error', '没有符合条件且可解析的 Excel 文件');
+        return;
+      }
+
+      setMergeProgress({
+        ...idleProgress,
+        stage: 'completed',
+        currentFileIndex: parseResult.data.workbooks.length,
+        totalFiles: nextFiles.length,
+        message: '扫描完成',
+      });
+      appendLog('merge', 'success', `扫描完成：${parseResult.data.workbooks.length} 个文件可合并`);
+    } catch (error) {
+      setMergeProgress({
+        ...idleProgress,
+        stage: 'failed',
+        message: '扫描失败',
+      });
+      appendLog('merge', 'error', getUnknownErrorMessage(error));
+    } finally {
+      setBusyTab(null);
     }
   }, [appendLog]);
+
+  const changeMergeMode = useCallback(
+    (mode: string): void => {
+      if (!isMergeMode(mode)) {
+        return;
+      }
+
+      setMergeMode(mode);
+      appendLog('merge', 'info', mode === 'single-sheet' ? '合并方式：合并到一个 sheet' : '合并方式：合并到多个 sheet');
+    },
+    [appendLog],
+  );
+
+  const changeMergeFieldRow = useCallback(
+    (fieldRow: string): void => {
+      setMergeFieldRow(fieldRow);
+      appendLog('merge', 'info', `字段名所在行为第 ${fieldRow} 行`);
+    },
+    [appendLog],
+  );
+
+  const changeMergeSheet = useCallback(
+    (sourceId: string, sheetName: string): void => {
+      const workbook = mergeParsedWorkbooks.find((candidate) => candidate.sourceId === sourceId);
+      const sheet = workbook?.sheets.find((candidateSheet) => candidateSheet.name === sheetName);
+      if (!workbook || !sheet) {
+        return;
+      }
+
+      setMergeSheetSelections((currentSelections) => ({
+        ...currentSelections,
+        [sourceId]: sheet.name,
+      }));
+      appendLog('merge', 'info', `${workbook.fileName} 选择 sheet：${sheet.name}`);
+    },
+    [appendLog, mergeParsedWorkbooks],
+  );
 
   const startSplit = useCallback(async (): Promise<void> => {
     if (splitFiles.length === 0 || splitParsedWorkbooks.length === 0) {
@@ -525,21 +641,94 @@ export const App = (): JSX.Element => {
     }
   }, [appendLog, outputDirectory, splitFiles.length, splitParsedWorkbooks, splitSettings]);
 
-  const startMerge = useCallback((): void => {
-    if (!mergeFolder) {
+  const startMerge = useCallback(async (): Promise<void> => {
+    if (!mergeFolder || mergeParsedWorkbooks.length === 0) {
       return;
     }
 
+    if (outputDirectory === '') {
+      appendLog('merge', 'error', '请先选择保存路径');
+      return;
+    }
+
+    if (!hasCompleteMergeSheetSelections(mergeParsedWorkbooks, mergeSheetSelections)) {
+      appendLog('merge', 'error', '请为每个文件选择一个 sheet');
+      return;
+    }
+
+    const fieldRow = Number(mergeFieldRow);
+    if (!Number.isInteger(fieldRow)) {
+      appendLog('merge', 'error', '字段名所在行无效');
+      return;
+    }
+
+    const jobFiles: StartMergeJobInput['files'] = mergeParsedWorkbooks.map((workbook) => ({
+      sheetName: mergeSheetSelections[workbook.sourceId] ?? '',
+      sourceId: workbook.sourceId,
+    }));
+
+    setCancelChoiceTab(null);
     setBusyTab('merge');
+    setMergeFiles((currentFiles) =>
+      currentFiles.map((file) => ({
+        ...file,
+        status: jobFiles.some((jobFile) => jobFile.sourceId === file.sourceId) ? 'pending' : file.status,
+      })),
+    );
     setMergeProgress({
-      stage: 'processing',
       currentFileIndex: 0,
-      totalFiles: mergeFiles.length,
-      currentFileName: mergeFolder.name,
-      message: '正在汇总',
+      message: '准备合并',
+      stage: 'processing',
+      totalFiles: jobFiles.length,
     });
-    appendLog('merge', 'info', `正在处理 ${mergeFolder.name}`);
-  }, [appendLog, mergeFiles.length, mergeFolder]);
+
+    try {
+      const result = await window.officeTools.excel.startMergeJob({
+        fieldRow,
+        files: jobFiles,
+        mode: mergeMode,
+        outputDirectory,
+      });
+
+      if (result.success === false) {
+        if (result.code !== 'JOB_CANCELED') {
+          setMergeProgress({
+            ...idleProgress,
+            stage: 'failed',
+            totalFiles: jobFiles.length,
+            message: '合并失败',
+          });
+          appendLog('merge', 'error', result.error);
+        }
+        return;
+      }
+
+      setCompletionDialog({
+        outputDirectory: result.data.outputDirectory,
+        tab: 'merge',
+        warning: result.data.warning,
+      });
+    } catch (error) {
+      setMergeProgress({
+        ...idleProgress,
+        stage: 'failed',
+        totalFiles: jobFiles.length,
+        message: '合并失败',
+      });
+      appendLog('merge', 'error', getUnknownErrorMessage(error));
+    } finally {
+      setBusyTab(null);
+      setCancelChoiceTab(null);
+    }
+  }, [
+    appendLog,
+    mergeFieldRow,
+    mergeFolder,
+    mergeMode,
+    mergeParsedWorkbooks,
+    mergeSheetSelections,
+    outputDirectory,
+  ]);
 
   const cancelAllTasks = useCallback(
     async (targetTab: WorkflowTab | null = null): Promise<void> => {
@@ -574,6 +763,18 @@ export const App = (): JSX.Element => {
       }
 
       if (tabToCancel === 'merge') {
+        setMergeFiles((currentFiles) =>
+          currentFiles.map((file) => {
+            if (file.status === 'pending' || file.status === 'processing') {
+              return {
+                ...file,
+                status: 'canceled',
+              };
+            }
+
+            return file;
+          }),
+        );
         setMergeProgress({
           ...idleProgress,
           stage: 'canceled',
@@ -672,16 +873,23 @@ export const App = (): JSX.Element => {
           />
         ) : (
           <MergeWorkflow
+            fieldRow={mergeFieldRow}
             files={mergeFiles}
             folder={mergeFolder}
             isBusy={busyTab === 'merge'}
             logs={selectedLogs}
+            mode={mergeMode}
             onCancel={requestCancelJob}
+            onFieldRowChange={changeMergeFieldRow}
+            onModeChange={changeMergeMode}
             onSelectFolder={selectMergeFolder}
             onSelectOutputDirectory={selectOutputDirectory}
+            onSheetChange={changeMergeSheet}
             onStart={startMerge}
             outputDirectory={outputDirectory}
+            parsedWorkbooks={mergeParsedWorkbooks}
             progress={mergeProgress}
+            sheetSelections={mergeSheetSelections}
           />
         )}
       </AppShell>
@@ -697,7 +905,9 @@ export const App = (): JSX.Element => {
               variant: 'primary',
             },
           ]}
-          description={`任务已完成，输出目录：${completionDialog.outputDirectory || '-'}`}
+          description={completionDialog.warning
+            ? `${completionDialog.warning} 任务已完成，输出目录：${completionDialog.outputDirectory || '-'}`
+            : `任务已完成，输出目录：${completionDialog.outputDirectory || '-'}`}
           title="任务完成"
         />
       ) : null}

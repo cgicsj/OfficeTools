@@ -13,6 +13,8 @@ export const IPC_CHANNELS = {
   EXCEL: {
     PARSE_SPLIT_DOCUMENTS: 'excel:parse-split-documents',
     START_SPLIT_JOB: 'excel:start-split-job',
+    PARSE_MERGE_FOLDER: 'excel:parse-merge-folder',
+    START_MERGE_JOB: 'excel:start-merge-job',
   },
   JOB: {
     CANCEL_ACTIVE: 'job:cancel-active',
