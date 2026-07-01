@@ -11,7 +11,8 @@
     "make": "electron-forge make",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "probe:excel": "node scripts/excel-probe.mjs"
+    "probe:excel": "node scripts/excel-probe.mjs",
+    "make:deb:arm64": "electron-forge make --platform linux --arch arm64 --targets @electron-forge/maker-deb"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

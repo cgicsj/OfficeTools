@@ -12,10 +12,23 @@ const config: ForgeConfig = {
   makers: [
     {
       name: '@electron-forge/maker-deb',
+      platforms: ['linux'],
       config: {
         options: {
-          maintainer: 'OfficeTools',
-          homepage: 'https://localhost/officetools',
+          name: 'office-tools',
+          productName: 'OfficeTools',
+          genericName: 'Office Document Tools',
+          description: 'Local Excel split and merge tools',
+          productDescription: 'OfficeTools provides local Excel split and merge workflows for .xls, .xlsx, and .et files.',
+          maintainer: 'OfficeTools Team',
+          bin: 'office-tools',
+          section: 'utils',
+          priority: 'optional',
+          categories: ['Office', 'Utility'],
+          mimeType: [
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          ],
         },
       },
     },

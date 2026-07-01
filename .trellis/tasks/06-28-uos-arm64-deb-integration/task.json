@@ -3,7 +3,7 @@
   "name": "uos-arm64-deb-integration",
   "title": "UOS ARM64 deb 打包与集成验收",
   "description": "",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

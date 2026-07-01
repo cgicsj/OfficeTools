@@ -23,6 +23,7 @@ The root `package.json` is private and delegates scripts to `@office-tools/deskt
 pnpm dev
 pnpm build
 pnpm make
+pnpm make:deb:arm64
 pnpm lint
 pnpm typecheck
 ```
@@ -49,6 +50,8 @@ Keep these settings unless Electron packaging is revalidated without them. They 
 - `@electron-forge/plugin-fuses`
 - `packagerConfig.asar: true`
 - executable name `office-tools`
+
+Use `pnpm make:deb:arm64` for the UOS ARM64 Debian package path. It delegates to `electron-forge make --platform linux --arch arm64 --targets @electron-forge/maker-deb` and writes ignored artifacts under `apps/desktop/out/make/deb/arm64/`.
 
 The Vite plugin has separate entries for:
 

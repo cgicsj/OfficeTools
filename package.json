@@ -14,6 +14,7 @@
     "make": "pnpm --filter @office-tools/desktop make",
     "lint": "pnpm --filter @office-tools/desktop lint",
     "typecheck": "pnpm --filter @office-tools/desktop typecheck",
-    "probe:excel": "pnpm --filter @office-tools/desktop probe:excel"
+    "probe:excel": "pnpm --filter @office-tools/desktop probe:excel",
+    "make:deb:arm64": "pnpm --filter @office-tools/desktop make:deb:arm64"
   }
 }

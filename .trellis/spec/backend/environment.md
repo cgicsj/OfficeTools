@@ -39,7 +39,7 @@ Main and preload output names are fixed to `main.js` and `preload.js`, matching 
 
 ## Packaging
 
-Forge config currently enables ASAR packaging, configures the Debian maker, and applies Electron fuses. If native modules are added for Excel processing, revisit packaging with a real package/build check and update this spec.
+Forge config currently enables ASAR packaging, configures the Debian maker, applies Electron fuses, and carries OfficeTools Debian metadata for the `office-tools` package. Use `pnpm make:deb:arm64` to produce the ARM64 Debian artifact under `apps/desktop/out/make/deb/arm64/`. If native modules are added for Excel processing, revisit packaging with a real package/build check and update this spec.
 
 ## Generated Files
 
