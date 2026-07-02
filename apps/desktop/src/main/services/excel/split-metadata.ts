@@ -1,3 +1,4 @@
+import * as nodeFs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import ExcelJS from 'exceljs';
@@ -9,7 +10,9 @@ import type {
   ParseSplitDocumentsResult,
 } from '../../../shared/types/excel';
 import { getRegisteredFilePath } from '../file-selection/file-registry';
+import { readExcelJsCellText } from './cell-text';
 
+XLSX.set_fs(nodeFs);
 XLSX.set_cptable(cpexcel);
 
 const PREVIEW_ROW_COUNT = 10;
@@ -34,26 +37,12 @@ const hasWorkbookContainerSignature = async (filePath: string): Promise<boolean>
   return signature.startsWith(ZIP_SIGNATURE) || signature === CFB_SIGNATURE;
 };
 
-const readCellText = (cell: ExcelJS.Cell): string => {
-  const text = cell.text;
-  if (text) {
-    return text;
-  }
-
-  const value = cell.value;
-  if (value === null || value === undefined) {
-    return '';
-  }
-
-  return String(value);
-};
-
 const readExcelJsSheet = (worksheet: ExcelJS.Worksheet): ParsedWorkbookSheet => {
   const columnCount = worksheet.columnCount;
   const previewRows = Array.from({ length: PREVIEW_ROW_COUNT }, (_row, rowIndex) => {
     const row = worksheet.getRow(rowIndex + 1);
     return Array.from({ length: columnCount }, (_column, columnIndex) => {
-      return readCellText(row.getCell(columnIndex + 1));
+      return readExcelJsCellText(row.getCell(columnIndex + 1));
     });
   });
 

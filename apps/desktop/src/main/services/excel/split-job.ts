@@ -1,3 +1,4 @@
+import * as nodeFs from 'node:fs';
 import crypto from 'node:crypto';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -13,6 +14,7 @@ import type {
   StartSplitJobInput,
 } from '../../../shared/types/excel';
 import type { JobEvent, JobProgress, LogEntry, WorkflowTab } from '../../../shared/types/jobs';
+import { readExcelJsCellText } from './cell-text';
 import { assertNoUnsupportedObjectsInDirectWorkbook } from './legacy-object-detector';
 import { getRegisteredFilePath } from '../file-selection/file-registry';
 import {
@@ -22,6 +24,7 @@ import {
 } from '../jobs/job-cancellation';
 import { createTempWorkspace, removeTempWorkspace } from '../workspace/temp-workspace';
 
+XLSX.set_fs(nodeFs);
 XLSX.set_cptable(cpexcel);
 
 const SPLIT_TAB: WorkflowTab = 'split';
@@ -182,19 +185,7 @@ const hasWorkbookContainerSignature = async (filePath: string): Promise<boolean>
   return signature.startsWith(ZIP_SIGNATURE) || signature === CFB_SIGNATURE;
 };
 
-const readCellText = (cell: ExcelJS.Cell): string => {
-  const text = cell.text;
-  if (text) {
-    return text;
-  }
-
-  const value = cell.value;
-  if (value === null || value === undefined) {
-    return '';
-  }
-
-  return String(value);
-};
+const readCellText = readExcelJsCellText;
 
 const isExcelJsFormulaValue = (value: ExcelJS.CellValue): value is ExcelJsFormulaValue => {
   return typeof value === 'object' && value !== null && ('formula' in value || 'sharedFormula' in value);

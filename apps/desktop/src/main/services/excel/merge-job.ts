@@ -1,3 +1,4 @@
+import * as nodeFs from 'node:fs';
 import crypto from 'node:crypto';
 import { access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -15,8 +16,10 @@ import type { JobEvent, JobProgress, LogEntry, WorkflowTab } from '../../../shar
 import { getRegisteredFilePath } from '../file-selection/file-registry';
 import { setActiveJobAbortController } from '../jobs/job-cancellation';
 import { createTempWorkspace, removeTempWorkspace } from '../workspace/temp-workspace';
+import { readExcelJsCellText } from './cell-text';
 import { assertNoUnsupportedObjectsInDirectWorkbook } from './legacy-object-detector';
 
+XLSX.set_fs(nodeFs);
 XLSX.set_cptable(cpexcel);
 
 const MERGE_TAB: WorkflowTab = 'merge';
@@ -159,20 +162,6 @@ const resolveUniqueOutputPath = async (directory: string, fileName: string): Pro
     index += 1;
     candidate = path.join(directory, `${baseName}_${index}${extension}`);
   }
-};
-
-const readExcelJsCellText = (cell: ExcelJS.Cell): string => {
-  const text = cell.text;
-  if (text) {
-    return text;
-  }
-
-  const value = cell.value;
-  if (value === null || value === undefined) {
-    return '';
-  }
-
-  return String(value);
 };
 
 const isExcelJsFormulaValue = (value: ExcelJS.CellValue): value is ExcelJsFormulaValue => {

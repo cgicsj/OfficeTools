@@ -371,3 +371,58 @@ The probe script is development tooling, not production UI. It writes:
 - generated local workbooks under `.trellis/tasks/06-28-excel-processing-probe/probe-output/`
 
 `probe-output/` is intentionally ignored except for its `.gitignore` file.
+
+## Excel Reader Runtime Contracts
+
+### 1. Scope / Trigger
+- Trigger this contract when adding or changing code that reads workbook metadata or workbook contents with ExcelJS or SheetJS.
+- Applies to `.xlsx` metadata previews, split jobs, merge jobs, and direct `.xls` / `.et` reading.
+
+### 2. Signatures
+- Safe ExcelJS text helper: `readExcelJsCellText(cell: ExcelJS.Cell): string` from `src/main/services/excel/cell-text.ts`.
+- SheetJS runtime setup in every main-process module that calls `XLSX.readFile(...)`:
+  - `import * as nodeFs from 'node:fs'`
+  - `XLSX.set_fs(nodeFs)`
+  - `XLSX.set_cptable(cpexcel)`
+
+### 3. Contracts
+- Do not call `cell.text` for ExcelJS user-file preview/grouping text. ExcelJS delegates to internal `toString()` implementations that can throw when malformed or nullable workbook values are present.
+- Use `readExcelJsCellText(...)` for ExcelJS display text. It must return `''` for `null` / `undefined`, formula results with `null`, and unrecognized object values.
+- Any file that calls `XLSX.readFile(...)` must call `XLSX.set_fs(nodeFs)` at module initialization. The SheetJS ESM build cannot access Node files in packaged Electron without this injection.
+- Keep direct `.xls` / `.et` container signature checks before parsing so unsupported content fails with a user-facing format message instead of a low-level parser error.
+
+### 4. Validation & Error Matrix
+| Condition | Expected Behavior |
+| --- | --- |
+| `.xlsx` cell value is `null` or malformed formula result is `null` | Preview/grouping text is `''`; no `toString` crash. |
+| ExcelJS object value is unrecognized | Preview/grouping text is `''`; do not expose `[object Object]`. |
+| SheetJS module omits `XLSX.set_fs(nodeFs)` | `.xls` / `.et` read can fail with `Cannot access file <path>` in packaged/runtime tests. |
+| Direct `.xls` / `.et` signature is invalid | Return the existing format error asking the user to save as `.xlsx`. |
+
+### 5. Good/Base/Bad Cases
+- Good: metadata parse registers temp `.xlsx`, `.xls`, and `.et` files, then `parseSplitDocumentMetadata(...)` returns three workbooks and no failures.
+- Base: a pure `.xlsx` workbook with blank cells previews blanks as empty strings.
+- Bad: a parser catches `Cannot read properties of null (reading 'toString')` and only rewrites the message while still using `cell.text`.
+
+### 6. Tests Required
+- Run `pnpm --filter @office-tools/desktop test:functional` after changing Excel reader setup or cell text helpers.
+- Functional coverage must include nullable `.xlsx` cells plus `.xls` and `.et` metadata parsing.
+- Run `pnpm typecheck` and `pnpm lint` before reporting completion.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```typescript
+const displayText = cell.text;
+const workbook = XLSX.readFile(sourcePath, options);
+```
+
+#### Correct
+
+```typescript
+XLSX.set_fs(nodeFs);
+XLSX.set_cptable(cpexcel);
+const displayText = readExcelJsCellText(cell);
+const workbook = XLSX.readFile(sourcePath, options);
+```
