@@ -88,14 +88,6 @@ export const SplitWorkflow = ({
           解析文档
         </Button>
         <Button
-          disabled={isBusy}
-          icon={<Save size={17} aria-hidden="true" />}
-          onClick={onSelectOutputDirectory}
-          title="保存至"
-        >
-          保存至
-        </Button>
-        <Button
           disabled={!canStart || isBusy}
           icon={<Play size={17} aria-hidden="true" />}
           onClick={onStart}
@@ -127,8 +119,18 @@ export const SplitWorkflow = ({
             <h2>拆分设置</h2>
             <span>{activeWorkbook?.fileName ?? '待解析'}</span>
           </div>
-          <div className="output-path" title={outputDirectory}>
-            保存路径：{outputDirectory || '-'}
+          <div className="save-path-setting">
+            <div className="output-path save-path-setting__path" title={outputDirectory}>
+              保存路径：{outputDirectory || '-'}
+            </div>
+            <Button
+              disabled={isBusy}
+              icon={<Save size={17} aria-hidden="true" />}
+              onClick={onSelectOutputDirectory}
+              title="保存至"
+            >
+              保存至
+            </Button>
           </div>
           <div className="settings-grid">
             <label>

@@ -97,18 +97,15 @@ export const MergeWorkflow = ({
             <h2>合并设置</h2>
             <span>{hasParsedWorkbook ? `${parsedWorkbooks.length} 个文件` : '待扫描'}</span>
           </div>
-          <div className="merge-output-setting">
-            <div className="merge-output-setting__body">
-              <span className="merge-output-setting__label">保存位置</span>
-              <div className="output-path merge-output-setting__path" title={outputDirectory}>
-                {outputDirectory || '未选择保存位置'}
-              </div>
+          <div className="save-path-setting">
+            <div className="output-path save-path-setting__path" title={outputDirectory}>
+              保存路径：{outputDirectory || '-'}
             </div>
             <Button
               disabled={isBusy}
               icon={<Save size={17} aria-hidden="true" />}
               onClick={onSelectOutputDirectory}
-              title="选择保存位置"
+              title="保存至"
             >
               保存至
             </Button>
