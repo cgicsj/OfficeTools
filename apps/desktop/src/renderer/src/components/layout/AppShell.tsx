@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { FileSpreadsheet, FileText, Image, Layers, Mic, Table2 } from 'lucide-react';
+import { FileSpreadsheet, Layers, Table2 } from 'lucide-react';
 import type { WorkflowTab } from '@shared/types/jobs';
 
 type AppShellProps = {
@@ -15,9 +15,6 @@ const tabs: Array<{ id: WorkflowTab; label: string; icon: ReactNode }> = [
 
 const modules: Array<{ label: string; icon: ReactNode; isActive?: boolean }> = [
   { label: '表格处理', icon: <Table2 size={18} aria-hidden="true" />, isActive: true },
-  { label: '文档排版', icon: <FileText size={18} aria-hidden="true" /> },
-  { label: '图片转文字', icon: <Image size={18} aria-hidden="true" /> },
-  { label: '语音转文字', icon: <Mic size={18} aria-hidden="true" /> },
 ];
 
 export const AppShell = ({ activeTab, onTabChange, children }: AppShellProps): JSX.Element => {
