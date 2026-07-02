@@ -25,6 +25,7 @@ type MergeWorkflowProps = {
   onModeChange: (mode: string) => void;
   onSelectFolder: () => void;
   onSelectOutputDirectory: () => void;
+  onRemoveFile: (sourceId: string) => void;
   onSheetChange: (sourceId: string, sheetName: string) => void;
   onStart: () => void;
   onCancel: () => void;
@@ -45,6 +46,7 @@ export const MergeWorkflow = ({
   onModeChange,
   onSelectFolder,
   onSelectOutputDirectory,
+  onRemoveFile,
   onSheetChange,
   onStart,
   onCancel,
@@ -62,14 +64,6 @@ export const MergeWorkflow = ({
           title="选择文件夹"
         >
           选择文件夹
-        </Button>
-        <Button
-          disabled={isBusy}
-          icon={<Save size={17} aria-hidden="true" />}
-          onClick={onSelectOutputDirectory}
-          title="保存至"
-        >
-          保存至
         </Button>
         <Button
           disabled={!canStart || isBusy}
@@ -93,18 +87,31 @@ export const MergeWorkflow = ({
       <section className="workflow-grid">
         <div className="workflow-panel">
           <div className="workflow-panel__header">
-            <h2>文件夹</h2>
-            <span>{folder?.name ?? '-'}</span>
+            <h2>文件</h2>
+            <span>{files.length > 0 ? `${files.length} 个文件` : '待选择'}</span>
           </div>
-          <div className="output-path" title={outputDirectory}>
-            保存路径：{outputDirectory || '-'}
-          </div>
-          <FileList files={files} />
+          <FileList canRemove={!isBusy} files={files} onRemoveFile={onRemoveFile} />
         </div>
         <div className="workflow-panel">
           <div className="workflow-panel__header">
             <h2>合并设置</h2>
             <span>{hasParsedWorkbook ? `${parsedWorkbooks.length} 个文件` : '待扫描'}</span>
+          </div>
+          <div className="merge-output-setting">
+            <div className="merge-output-setting__body">
+              <span className="merge-output-setting__label">保存位置</span>
+              <div className="output-path merge-output-setting__path" title={outputDirectory}>
+                {outputDirectory || '未选择保存位置'}
+              </div>
+            </div>
+            <Button
+              disabled={isBusy}
+              icon={<Save size={17} aria-hidden="true" />}
+              onClick={onSelectOutputDirectory}
+              title="选择保存位置"
+            >
+              保存至
+            </Button>
           </div>
           <div className="settings-grid">
             <label>

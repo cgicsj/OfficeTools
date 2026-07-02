@@ -554,6 +554,35 @@ export const App = (): JSX.Element => {
     [appendLog, mergeParsedWorkbooks],
   );
 
+  const removeMergeFile = useCallback(
+    (sourceId: string): void => {
+      if (busyTab === 'merge') {
+        return;
+      }
+
+      const fileToRemove = mergeFiles.find((file) => file.sourceId === sourceId);
+      setMergeFiles((currentFiles) => currentFiles.filter((file) => file.sourceId !== sourceId));
+      setMergeParsedWorkbooks((currentWorkbooks) => currentWorkbooks.filter((workbook) => workbook.sourceId !== sourceId));
+      setMergeSheetSelections((currentSelections) => {
+        const nextSelections = { ...currentSelections };
+        delete nextSelections[sourceId];
+        return nextSelections;
+      });
+      setMergeProgress((currentProgress) => ({
+        ...currentProgress,
+        currentFileIndex: Math.max(0, Math.min(currentProgress.currentFileIndex, Math.max(mergeFiles.length - 1, 0))),
+        message: mergeFiles.length <= 1 ? '暂无可合并文件' : '已移除文件',
+        stage: mergeFiles.length <= 1 ? 'idle' : currentProgress.stage,
+        totalFiles: Math.max(mergeFiles.length - 1, 0),
+      }));
+
+      if (fileToRemove) {
+        appendLog('merge', 'warning', `已移除 ${fileToRemove.name}`);
+      }
+    },
+    [appendLog, busyTab, mergeFiles],
+  );
+
   const startSplit = useCallback(async (): Promise<void> => {
     if (splitFiles.length === 0 || splitParsedWorkbooks.length === 0) {
       return;
@@ -884,6 +913,7 @@ export const App = (): JSX.Element => {
             onModeChange={changeMergeMode}
             onSelectFolder={selectMergeFolder}
             onSelectOutputDirectory={selectOutputDirectory}
+            onRemoveFile={removeMergeFile}
             onSheetChange={changeMergeSheet}
             onStart={startMerge}
             outputDirectory={outputDirectory}
