@@ -265,3 +265,35 @@ Fixed nullable ExcelJS cell text handling and SheetJS fs initialization for .xls
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: Optimize merge workflow details
+
+**Date**: 2026-07-02
+**Task**: Optimize merge workflow details
+
+### Summary
+
+Moved merge save-location controls into settings, hid source folder location, added removable merge files, bumped desktop version to 0.1.1, validated the standard Debian application launcher, and rebuilt the ARM64 deb.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bf32f52` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
