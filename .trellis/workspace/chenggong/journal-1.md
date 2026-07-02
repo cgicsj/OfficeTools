@@ -169,3 +169,35 @@ Fixed packaged Electron renderer output path so linux arm64 builds place main_wi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Add functional Excel workflow test
+
+**Date**: 2026-07-02
+**Task**: Add functional Excel workflow test
+
+### Summary
+
+Added a Node-runnable desktop functional test for Excel split and merge workflows, plus script/config, validation, and backend quality spec guidance.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `aa2c701` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
