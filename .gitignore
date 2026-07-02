@@ -7,4 +7,4 @@ out/
 *.local
 coverage/
 app-dev.db
-
+apps/desktop/.functional-tests/

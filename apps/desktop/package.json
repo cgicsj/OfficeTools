@@ -12,7 +12,8 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "probe:excel": "node scripts/excel-probe.mjs",
-    "make:deb:arm64": "electron-forge make --platform linux --arch arm64 --targets @electron-forge/maker-deb"
+    "make:deb:arm64": "electron-forge make --platform linux --arch arm64 --targets @electron-forge/maker-deb",
+    "test:functional": "vite build --config tests/functional/vite.config.ts && node --test .functional-tests/excel-workflows.test.mjs"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
