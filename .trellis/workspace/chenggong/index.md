@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 7
+- **Total Sessions**: 8
 - **Last Active**: 2026-07-02
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~235 | Active |
+| `journal-1.md` | ~267 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 8 | 2026-07-02 | Fix Excel parse errors | `b19ab06` | `-` |
 | 7 | 2026-07-02 | Fix deb renderer white screen | `c3f050f` | `-` |
 | 6 | 2026-07-02 | Add functional Excel workflow test | `aa2c701` | `-` |
 | 5 | 2026-07-01 | Fix UOS white screen renderer packaging | `b9e584a` | `-` |

@@ -233,3 +233,35 @@ Tracked the deb white-screen bug, identified a stale deb payload missing the ren
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: Fix Excel parse errors
+
+**Date**: 2026-07-02
+**Task**: Fix Excel parse errors
+
+### Summary
+
+Fixed nullable ExcelJS cell text handling and SheetJS fs initialization for .xls/.et parsing, added functional regression coverage, rebuilt the app and regenerated the ARM64 deb.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b19ab06` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
