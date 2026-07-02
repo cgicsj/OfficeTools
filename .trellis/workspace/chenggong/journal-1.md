@@ -361,3 +361,35 @@ Removed unfinished document formatting, image-to-text, and speech-to-text entrie
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: Align save path controls
+
+**Date**: 2026-07-02
+**Task**: Align save path controls
+
+### Summary
+
+Moved split save selection into split settings, unified split and merge save-path rows with one-line 保存路径 display, bumped desktop version to 0.1.4, and regenerated the ARM64 deb.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `17f2385` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

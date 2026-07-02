@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 11
+- **Total Sessions**: 12
 - **Last Active**: 2026-07-02
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~363 | Active |
+| `journal-1.md` | ~395 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 12 | 2026-07-02 | Align save path controls | `17f2385` | `-` |
 | 11 | 2026-07-02 | Hide unfinished phase one modules | `0dd0a6b` | `-` |
 | 10 | 2026-07-02 | Move workflow progress panel | `cd35934` | `-` |
 | 9 | 2026-07-02 | Optimize merge workflow details | `bf32f52` | `-` |
