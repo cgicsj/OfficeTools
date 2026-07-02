@@ -201,3 +201,35 @@ Added a Node-runnable desktop functional test for Excel split and merge workflow
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Fix deb renderer white screen
+
+**Date**: 2026-07-02
+**Task**: Fix deb renderer white screen
+
+### Summary
+
+Tracked the deb white-screen bug, identified a stale deb payload missing the renderer HTML in app.asar, regenerated the ARM64 deb, and verified the packaged app.asar contains .vite/renderer/main_window/index.html.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c3f050f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
