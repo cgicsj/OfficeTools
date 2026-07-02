@@ -329,3 +329,35 @@ Moved split and merge progress panels into a shared full-width row above the log
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: Hide unfinished phase one modules
+
+**Date**: 2026-07-02
+**Task**: Hide unfinished phase one modules
+
+### Summary
+
+Removed unfinished document formatting, image-to-text, and speech-to-text entries from the left navigation, kept phase-one table workflows visible, bumped version to 0.1.3, and regenerated the ARM64 deb.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0dd0a6b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
