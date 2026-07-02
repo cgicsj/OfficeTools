@@ -297,3 +297,35 @@ Moved merge save-location controls into settings, hid source folder location, ad
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: Move workflow progress panel
+
+**Date**: 2026-07-02
+**Task**: Move workflow progress panel
+
+### Summary
+
+Moved split and merge progress panels into a shared full-width row above the logs, bumped desktop version to 0.1.2, and regenerated the ARM64 deb.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cd35934` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
