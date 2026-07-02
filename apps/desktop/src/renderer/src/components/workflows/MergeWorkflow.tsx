@@ -162,8 +162,10 @@ export const MergeWorkflow = ({
               </label>
             ))}
           </div>
-          <ProgressPanel progress={progress} />
         </div>
+      </section>
+      <section className="workflow-progress" aria-label="处理进度">
+        <ProgressPanel progress={progress} />
       </section>
       <WorkflowLog logs={logs} />
     </div>

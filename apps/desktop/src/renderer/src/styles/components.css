@@ -269,7 +269,6 @@
   display: flex;
   gap: 12px;
   justify-content: space-between;
-  margin-top: auto;
   min-height: 52px;
   padding: 10px 12px;
 }
