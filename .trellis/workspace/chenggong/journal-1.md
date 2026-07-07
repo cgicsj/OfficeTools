@@ -457,3 +457,35 @@ Added service-level coverage for Excel metadata and merge-folder edge cases, str
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: Add remote speech model download
+
+**Date**: 2026-07-07
+**Task**: Add remote speech model download
+
+### Summary
+
+Added first-use remote speech model download with packaged default config, user-editable model base URL, main-process download/extraction/cache management, progress events, local model env injection, speech UI settings and confirmation modals, save-path alignment refinement, functional tests with local zip fixtures, and backend service spec coverage.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `31e7b35` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

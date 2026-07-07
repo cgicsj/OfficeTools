@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
+- **Total Sessions**: 15
 - **Last Active**: 2026-07-07
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~459 | Active |
+| `journal-1.md` | ~491 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-07-07 | Add remote speech model download | `31e7b35` | `-` |
 | 14 | 2026-07-07 | Add Excel and speech module tests | `52b664d` | `-` |
 | 13 | 2026-07-07 | Add local speech-to-text workflow | `24e7403` | `-` |
 | 12 | 2026-07-02 | Align save path controls | `17f2385` | `-` |
