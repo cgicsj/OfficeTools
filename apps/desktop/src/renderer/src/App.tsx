@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MergeMode, ParsedWorkbook, StartMergeJobInput, StartSplitJobInput } from '@shared/types/excel';
 import type { FileListItem, SelectedFile, SelectedFolder } from '@shared/types/files';
 import type { JobProgress, LogEntry, WorkflowTab } from '@shared/types/jobs';
+import type { SpeechEvent, SpeechTranscriptionItem, SpeechTranscriptionProgress } from '@shared/types/speech';
 import { APP_CONFIG } from '@shared/constants/config';
 import { AppShell } from './components/layout/AppShell';
+import type { AppModule } from './components/layout/AppShell';
 import { ModalDialog } from './components/ui/ModalDialog';
 import { MergeWorkflow } from './components/workflows/MergeWorkflow';
 import { SplitWorkflow } from './components/workflows/SplitWorkflow';
+import { SpeechWorkflow } from './components/workflows/SpeechWorkflow';
 import { createLogEntry } from './lib/logs';
 import { createDefaultMergeSheetSelections, hasCompleteMergeSheetSelections } from './lib/merge-settings';
 import type { MergeSheetSelections } from './lib/merge-settings';
@@ -28,10 +31,23 @@ const idleProgress: JobProgress = {
   message: '等待处理',
 };
 
+const idleSpeechProgress: SpeechTranscriptionProgress = {
+  currentFileIndex: 0,
+  totalFiles: 0,
+  message: '等待处理',
+};
+
 type CompletionDialogState = {
   outputDirectory: string;
-  tab: WorkflowTab;
+  tab: WorkflowTab | 'speech';
   warning?: string;
+};
+
+type SpeechLogEntry = {
+  id: string;
+  level: 'info' | 'success' | 'warning' | 'error';
+  message: string;
+  timestampMs: number;
 };
 
 const toFileListItems = (files: SelectedFile[]): FileListItem[] => {
@@ -42,6 +58,7 @@ const toFileListItems = (files: SelectedFile[]): FileListItem[] => {
 };
 
 const supportedExcelExtensions = new Set<string>(APP_CONFIG.SUPPORTED_EXCEL_EXTENSIONS);
+const supportedAudioExtensions = new Set<string>(APP_CONFIG.SUPPORTED_AUDIO_EXTENSIONS);
 
 const isSupportedExcelFile = (file: SelectedFile): boolean => {
   return supportedExcelExtensions.has(file.extension.toLowerCase());
@@ -49,6 +66,19 @@ const isSupportedExcelFile = (file: SelectedFile): boolean => {
 
 const isWithinFileSizeLimit = (file: SelectedFile): boolean => {
   return file.sizeBytes <= APP_CONFIG.LIMITS.MAX_FILE_SIZE_BYTES;
+};
+
+const isSupportedAudioFile = (file: SelectedFile): boolean => {
+  return supportedAudioExtensions.has(file.extension.toLowerCase());
+};
+
+const toSpeechItems = (files: SelectedFile[]): SpeechTranscriptionItem[] => {
+  return files.map((file) => ({
+    ...file,
+    rawText: '',
+    status: 'pending',
+    transcript: '',
+  }));
 };
 
 const isMergeMode = (value: string): value is MergeMode => {
@@ -64,6 +94,7 @@ const getUnknownErrorMessage = (error: unknown): string => {
 };
 
 export const App = (): JSX.Element => {
+  const [activeModule, setActiveModule] = useState<AppModule>('tables');
   const [activeTab, setActiveTab] = useState<WorkflowTab>('split');
   const [splitFiles, setSplitFiles] = useState<FileListItem[]>([]);
   const [splitParsedWorkbooks, setSplitParsedWorkbooks] = useState<ParsedWorkbook[]>([]);
@@ -85,12 +116,28 @@ export const App = (): JSX.Element => {
   const [busyTab, setBusyTab] = useState<WorkflowTab | null>(null);
   const [completionDialog, setCompletionDialog] = useState<CompletionDialogState | null>(null);
   const [cancelChoiceTab, setCancelChoiceTab] = useState<WorkflowTab | null>(null);
+  const [speechFiles, setSpeechFiles] = useState<SpeechTranscriptionItem[]>([]);
+  const [speechProgress, setSpeechProgress] = useState<SpeechTranscriptionProgress>(idleSpeechProgress);
+  const [speechLogs, setSpeechLogs] = useState<SpeechLogEntry[]>([]);
+  const [isSpeechBusy, setIsSpeechBusy] = useState(false);
 
   const appendLog = useCallback((tab: WorkflowTab, level: LogEntry['level'], message: string): void => {
     setLogs((currentLogs) => ({
       ...currentLogs,
       [tab]: [...currentLogs[tab], createLogEntry(tab, level, message)],
     }));
+  }, []);
+
+  const appendSpeechLog = useCallback((level: SpeechLogEntry['level'], message: string): void => {
+    setSpeechLogs((currentLogs) => [
+      ...currentLogs,
+      {
+        id: crypto.randomUUID(),
+        level,
+        message,
+        timestampMs: Date.now(),
+      },
+    ]);
   }, []);
 
 
@@ -163,7 +210,42 @@ export const App = (): JSX.Element => {
     });
   }, []);
 
+  useEffect(() => {
+    return window.officeTools.speech.onSpeechEvent((event: SpeechEvent) => {
+      if (event.type === 'progress') {
+        setSpeechProgress(event.progress);
+        return;
+      }
+
+      if (event.type === 'log') {
+        setSpeechLogs((currentLogs) => [
+          ...currentLogs,
+          {
+            id: crypto.randomUUID(),
+            level: event.level,
+            message: event.message,
+            timestampMs: event.timestampMs,
+          },
+        ]);
+        return;
+      }
+
+      setSpeechFiles((currentFiles) =>
+        currentFiles.map((file) => {
+          if (file.sourceId !== event.item.sourceId) {
+            return file;
+          }
+
+          return event.item;
+        }),
+      );
+    });
+  }, []);
+
   const selectedLogs = useMemo(() => logs[activeTab], [activeTab, logs]);
+  const canExportSpeech = useMemo(() => {
+    return speechFiles.some((file) => file.status === 'completed' && file.transcript.trim().length > 0) && outputDirectory.length > 0;
+  }, [outputDirectory, speechFiles]);
   const activeSplitSettings = useMemo(() => {
     return splitSettings[activeSplitSourceId];
   }, [activeSplitSourceId, splitSettings]);
@@ -853,6 +935,204 @@ export const App = (): JSX.Element => {
     appendLog('split', 'warning', `正在跳过当前文件 ${currentFile.name}`);
   }, [appendLog, cancelChoiceTab, splitFiles]);
 
+  const changeModule = useCallback((module: AppModule): void => {
+    setActiveModule(module);
+  }, []);
+
+  const selectSpeechFiles = useCallback(async (): Promise<void> => {
+    const result = await window.officeTools.dialog.selectAudioFiles();
+    if (result.success === false) {
+      appendSpeechLog('error', result.error);
+      return;
+    }
+
+    if (result.data.length === 0) {
+      return;
+    }
+
+    const unsupportedFiles = result.data.filter((file) => !isSupportedAudioFile(file));
+    const validFiles = result.data.filter((file) => isSupportedAudioFile(file));
+    unsupportedFiles.forEach((file) => {
+      appendSpeechLog('warning', `${file.name} 类型不支持，已排除`);
+    });
+
+    if (validFiles.length === 0) {
+      appendSpeechLog('error', '没有符合条件的音频文件');
+      return;
+    }
+
+    const nextFiles = toSpeechItems(validFiles.slice(0, APP_CONFIG.LIMITS.MAX_FILES));
+    if (validFiles.length > APP_CONFIG.LIMITS.MAX_FILES) {
+      appendSpeechLog('warning', `最多支持 ${APP_CONFIG.LIMITS.MAX_FILES} 个文件，已保留前 ${APP_CONFIG.LIMITS.MAX_FILES} 个`);
+    }
+
+    setSpeechFiles(nextFiles);
+    setSpeechProgress({
+      ...idleSpeechProgress,
+      totalFiles: nextFiles.length,
+    });
+    appendSpeechLog('info', `已选择 ${nextFiles.length} 个音频文件`);
+  }, [appendSpeechLog]);
+
+  const removeSpeechFile = useCallback((sourceId: string): void => {
+    setSpeechFiles((currentFiles) => currentFiles.filter((file) => file.sourceId !== sourceId));
+  }, []);
+
+  const runSpeechFiles = useCallback(
+    async (sourceIds: string[]): Promise<void> => {
+      if (sourceIds.length === 0) {
+        appendSpeechLog('warning', '请先选择需要转写的音频文件');
+        return;
+      }
+
+      setIsSpeechBusy(true);
+      setSpeechFiles((currentFiles) =>
+        currentFiles.map((file) =>
+          sourceIds.includes(file.sourceId)
+            ? {
+                ...file,
+                error: undefined,
+                rawText: '',
+                status: 'pending',
+                transcript: '',
+              }
+            : file,
+        ),
+      );
+      setSpeechProgress({
+        currentFileIndex: 0,
+        message: '准备转写',
+        totalFiles: sourceIds.length,
+      });
+
+      try {
+        const result = await window.officeTools.speech.startTranscriptionJob({ sourceIds });
+        if (result.success === false) {
+          if (result.code !== 'JOB_CANCELED') {
+            appendSpeechLog('error', result.error);
+          }
+          return;
+        }
+
+        setSpeechFiles((currentFiles) =>
+          currentFiles.map((file) => result.data.items.find((item) => item.sourceId === file.sourceId) ?? file),
+        );
+        appendSpeechLog(
+          result.data.summary.failedFiles > 0 ? 'warning' : 'success',
+          `转写完成：成功 ${result.data.summary.completedFiles} 个，失败 ${result.data.summary.failedFiles} 个`,
+        );
+      } catch (error) {
+        appendSpeechLog('error', getUnknownErrorMessage(error));
+      } finally {
+        setIsSpeechBusy(false);
+      }
+    },
+    [appendSpeechLog],
+  );
+
+  const startSpeechTranscription = useCallback(async (): Promise<void> => {
+    await runSpeechFiles(speechFiles.map((file) => file.sourceId));
+  }, [runSpeechFiles, speechFiles]);
+
+  const retrySpeechFile = useCallback(
+    (sourceId: string): void => {
+      void runSpeechFiles([sourceId]);
+    },
+    [runSpeechFiles],
+  );
+
+  const cancelSpeechTranscription = useCallback(async (): Promise<void> => {
+    const result = await window.officeTools.jobs.cancelActiveJob();
+    if (result.success === false) {
+      appendSpeechLog('error', result.error);
+      return;
+    }
+
+    setSpeechFiles((currentFiles) =>
+      currentFiles.map((file) => {
+        if (file.status === 'pending' || file.status === 'processing') {
+          return {
+            ...file,
+            error: '用户已取消',
+            status: 'canceled',
+          };
+        }
+
+        return file;
+      }),
+    );
+    setSpeechProgress({
+      ...idleSpeechProgress,
+      totalFiles: speechFiles.length,
+      message: '用户已取消',
+    });
+    setIsSpeechBusy(false);
+    appendSpeechLog('warning', '用户已取消语音转文字任务');
+  }, [appendSpeechLog, speechFiles.length]);
+
+  const copySpeechTranscript = useCallback(
+    async (sourceId: string): Promise<void> => {
+      const item = speechFiles.find((file) => file.sourceId === sourceId);
+      if (!item) {
+        appendSpeechLog('error', '转写结果不存在');
+        return;
+      }
+
+      await navigator.clipboard.writeText(item.transcript);
+      appendSpeechLog('success', `已复制 ${item.name} 的转写文本`);
+    },
+    [appendSpeechLog, speechFiles],
+  );
+
+  const copyAllSpeechTranscripts = useCallback(async (): Promise<void> => {
+    const textToCopy = speechFiles
+      .filter((file) => file.status === 'completed')
+      .map((file) => `# ${file.name}\n${file.transcript}`)
+      .join('\n\n');
+
+    if (!textToCopy) {
+      appendSpeechLog('warning', '没有可复制的转写结果');
+      return;
+    }
+
+    await navigator.clipboard.writeText(textToCopy);
+    appendSpeechLog('success', '已复制全部转写文本');
+  }, [appendSpeechLog, speechFiles]);
+
+  const exportSpeechTranscripts = useCallback(async (): Promise<void> => {
+    const completedItems = speechFiles.filter((file) => file.status === 'completed' && file.transcript.trim().length > 0);
+    if (completedItems.length === 0) {
+      appendSpeechLog('warning', '没有可导出的转写结果');
+      return;
+    }
+
+    if (!outputDirectory) {
+      appendSpeechLog('warning', '请先选择保存路径');
+      return;
+    }
+
+    const result = await window.officeTools.speech.exportTranscripts({
+      outputDirectory,
+      items: completedItems.map((item) => ({
+        name: item.name,
+        sourceId: item.sourceId,
+        transcript: item.transcript,
+      })),
+    });
+
+    if (result.success === false) {
+      appendSpeechLog('error', result.error);
+      return;
+    }
+
+    setCompletionDialog({
+      outputDirectory: result.data.outputDirectory,
+      tab: 'speech',
+      warning: `已导出 ${result.data.files.length} 个 TXT 文件。`,
+    });
+    appendSpeechLog('success', `已导出 ${result.data.files.length} 个 TXT 文件`);
+  }, [appendSpeechLog, outputDirectory, speechFiles]);
+
   const dismissCompletionDialog = useCallback((): void => {
     setCompletionDialog(null);
   }, []);
@@ -868,18 +1148,52 @@ export const App = (): JSX.Element => {
     });
 
     if (result.success === false) {
-      appendLog(completionDialog.tab, 'error', result.error);
+      if (completionDialog.tab === 'speech') {
+        appendSpeechLog('error', result.error);
+      } else {
+        appendLog(completionDialog.tab, 'error', result.error);
+      }
       return;
     }
 
-    appendLog(completionDialog.tab, 'info', '已打开输出文件夹');
+    if (completionDialog.tab === 'speech') {
+      appendSpeechLog('info', '已打开输出文件夹');
+    } else {
+      appendLog(completionDialog.tab, 'info', '已打开输出文件夹');
+    }
     setCompletionDialog(null);
-  }, [appendLog, completionDialog]);
+  }, [appendLog, appendSpeechLog, completionDialog]);
 
   return (
     <>
-      <AppShell activeTab={activeTab} onTabChange={setActiveTab}>
-        {activeTab === 'split' ? (
+      <AppShell activeModule={activeModule} activeTab={activeTab} onModuleChange={changeModule} onTabChange={setActiveTab}>
+        {activeModule === 'speech' ? (
+          <SpeechWorkflow
+            canExport={canExportSpeech}
+            files={speechFiles}
+            isBusy={isSpeechBusy}
+            logs={speechLogs}
+            onCancel={cancelSpeechTranscription}
+            onCopyAll={() => {
+              void copyAllSpeechTranscripts();
+            }}
+            onCopyTranscript={(sourceId) => {
+              void copySpeechTranscript(sourceId);
+            }}
+            onExport={() => {
+              void exportSpeechTranscripts();
+            }}
+            onRemoveFile={removeSpeechFile}
+            onRetryFile={retrySpeechFile}
+            onSelectFiles={selectSpeechFiles}
+            onSelectOutputDirectory={selectOutputDirectory}
+            onStart={() => {
+              void startSpeechTranscription();
+            }}
+            outputDirectory={outputDirectory}
+            progress={speechProgress}
+          />
+        ) : activeTab === 'split' ? (
           <SplitWorkflow
             activeSourceId={activeSplitSourceId}
             files={splitFiles}

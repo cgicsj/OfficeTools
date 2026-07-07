@@ -23,6 +23,26 @@ export const setupDialogHandlers = (): void => {
     return { success: true, data: files };
   });
 
+  ipcMain.handle(IPC_CHANNELS.DIALOG.SELECT_AUDIO_FILES, async () => {
+    const result = await dialog.showOpenDialog({
+      title: '选择音频文件',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        {
+          name: '音频文件',
+          extensions: ['wav', 'mp3', 'm4a', 'flac'],
+        },
+      ],
+    });
+
+    if (result.canceled) {
+      return { success: true, data: [] };
+    }
+
+    const files = await registerSelectedFiles(result.filePaths);
+    return { success: true, data: files };
+  });
+
   ipcMain.handle(IPC_CHANNELS.DIALOG.SELECT_FOLDER, async () => {
     const result = await dialog.showOpenDialog({
       title: '选择文件夹',

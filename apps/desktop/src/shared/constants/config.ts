@@ -12,5 +12,6 @@ export const APP_CONFIG = {
     MAX_SPLIT_OUTPUT_FILES: 500,
   },
   SUPPORTED_EXCEL_EXTENSIONS: ['xls', 'xlsx', 'et'],
+  SUPPORTED_AUDIO_EXTENSIONS: ['wav', 'mp3', 'm4a', 'flac'],
 } as const;
 

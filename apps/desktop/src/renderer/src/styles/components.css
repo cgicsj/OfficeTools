@@ -393,3 +393,122 @@
     grid-template-columns: 1fr;
   }
 }
+
+.speech-file-list,
+.speech-result-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 0;
+  scrollbar-gutter: stable;
+}
+
+.speech-file-list {
+  list-style: none;
+}
+
+.speech-file-list__item {
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 28px minmax(0, 1fr) 30px;
+  min-height: 58px;
+  padding: 10px;
+}
+
+.speech-file-list__item--processing {
+  border-color: #b9d8d4;
+  background: var(--color-primary-soft);
+}
+
+.speech-file-list__item--completed {
+  border-color: #b7d8c3;
+}
+
+.speech-file-list__item--failed {
+  border-color: #e2aaa8;
+}
+
+.speech-file-list__index {
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.speech-file-list__body {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.speech-file-list__name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.speech-file-list__meta {
+  color: var(--color-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.speech-file-list__error {
+  color: var(--color-error);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.speech-result-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.speech-result-card--completed {
+  border-color: #b7d8c3;
+}
+
+.speech-result-card--failed {
+  border-color: #e2aaa8;
+}
+
+.speech-result-card__header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.speech-result-card__header h3 {
+  font-size: 14px;
+  margin: 0 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.speech-result-card__header span {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.speech-result-card__text,
+.speech-result-card__error {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.speech-result-card__error {
+  color: var(--color-error);
+}

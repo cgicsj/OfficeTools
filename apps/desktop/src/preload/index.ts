@@ -3,10 +3,12 @@ import { IPC_CHANNELS } from '../shared/constants/channels';
 import type { JobEvent } from '../shared/types/jobs';
 import type { OfficeToolsApi } from '../shared/types/ipc';
 import type { SetLastOutputDirectoryInput } from '../shared/types/preferences';
+import type { ExportSpeechTranscriptsInput, SpeechEvent, StartSpeechTranscriptionInput } from '../shared/types/speech';
 
 const officeToolsApi: OfficeToolsApi = {
   dialog: {
     selectExcelFiles: () => ipcRenderer.invoke(IPC_CHANNELS.DIALOG.SELECT_EXCEL_FILES),
+    selectAudioFiles: () => ipcRenderer.invoke(IPC_CHANNELS.DIALOG.SELECT_AUDIO_FILES),
     selectFolder: () => ipcRenderer.invoke(IPC_CHANNELS.DIALOG.SELECT_FOLDER),
     selectOutputDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.DIALOG.SELECT_OUTPUT_DIRECTORY),
   },
@@ -36,6 +38,22 @@ const officeToolsApi: OfficeToolsApi = {
       ipcRenderer.on(IPC_CHANNELS.JOB.EVENT, handler);
       return () => {
         ipcRenderer.removeListener(IPC_CHANNELS.JOB.EVENT, handler);
+      };
+    },
+  },
+  speech: {
+    startTranscriptionJob: (input: StartSpeechTranscriptionInput) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SPEECH.START_TRANSCRIPTION_JOB, input),
+    exportTranscripts: (input: ExportSpeechTranscriptsInput) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SPEECH.EXPORT_TRANSCRIPTS, input),
+    onSpeechEvent: (listener: (event: SpeechEvent) => void) => {
+      const handler = (_event: IpcRendererEvent, payload: SpeechEvent): void => {
+        listener(payload);
+      };
+
+      ipcRenderer.on(IPC_CHANNELS.SPEECH.EVENT, handler);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.SPEECH.EVENT, handler);
       };
     },
   },

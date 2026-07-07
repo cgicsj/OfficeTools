@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as nodeFs from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -12,8 +12,10 @@ import { registerSelectedFiles } from '../../src/main/services/file-selection/fi
 import { parseSplitDocumentMetadata } from '../../src/main/services/excel/split-metadata';
 import { runMergeJob } from '../../src/main/services/excel/merge-job';
 import { runSplitJob } from '../../src/main/services/excel/split-job';
+import { exportSpeechTranscripts, runSpeechTranscriptionJob } from '../../src/main/services/speech/speech-job';
 import type { JobEvent } from '../../src/shared/types/jobs';
 import type { SelectedFile } from '../../src/shared/types/files';
+import type { SpeechEvent } from '../../src/shared/types/speech';
 
 XLSX.set_fs(nodeFs);
 XLSX.set_cptable(cpexcel);
@@ -202,6 +204,65 @@ test('parses metadata for null xlsx cells and legacy workbook files', async () =
     );
     assert.equal(metadata.workbooks.find((workbook) => workbook.fileName === 'nullable.xlsx')?.sheets[0]?.previewRows[1]?.[0], '');
   } finally {
+    await rm(workspace, { force: true, recursive: true });
+  }
+});
+
+
+test('transcribes speech files with fake helper and continues after unsupported files', async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), 'office-tools-speech-'));
+  const originalFakeMode = process.env.OFFICE_TOOLS_SPEECH_FAKE;
+
+  try {
+    process.env.OFFICE_TOOLS_SPEECH_FAKE = '1';
+    const firstAudioPath = path.join(workspace, 'meeting.wav');
+    const unsupportedPath = path.join(workspace, 'notes.txt');
+    const secondAudioPath = path.join(workspace, 'interview.flac');
+    await writeFile(firstAudioPath, 'fake wav content');
+    await writeFile(unsupportedPath, 'not audio');
+    await writeFile(secondAudioPath, 'fake flac content');
+
+    const selectedFiles = await registerSelectedFiles([firstAudioPath, unsupportedPath, secondAudioPath]);
+    const events: SpeechEvent[] = [];
+    const result = await runSpeechTranscriptionJob(
+      {
+        sourceIds: selectedFiles.map((file) => file.sourceId),
+      },
+      (event) => events.push(event),
+    );
+
+    assert.equal(result.summary.totalFiles, 3);
+    assert.equal(result.summary.completedFiles, 2);
+    assert.equal(result.summary.failedFiles, 1);
+    assert.equal(result.items[0]?.status, 'completed');
+    assert.match(result.items[0]?.transcript ?? '', /meeting\.wav/);
+    assert.equal(result.items[1]?.status, 'failed');
+    assert.match(result.items[1]?.error ?? '', /TXT 类型不支持/);
+    assert.equal(result.items[2]?.status, 'completed');
+    assert.match(result.items[2]?.transcript ?? '', /interview\.flac/);
+    assert.ok(events.some((event) => event.type === 'progress' && event.progress.message === '批量转写完成'));
+
+    const outputDirectory = path.join(workspace, 'transcripts');
+    await mkdir(outputDirectory, { recursive: true });
+    const exportResult = await exportSpeechTranscripts({
+      outputDirectory,
+      items: result.items
+        .filter((item) => item.status === 'completed')
+        .map((item) => ({
+          name: item.name,
+          sourceId: item.sourceId,
+          transcript: item.transcript,
+        })),
+    });
+
+    assert.equal(exportResult.files.length, 2);
+    assert.match(await readFile(exportResult.files[0]?.path ?? '', 'utf8'), /meeting\.wav/);
+  } finally {
+    if (originalFakeMode === undefined) {
+      delete process.env.OFFICE_TOOLS_SPEECH_FAKE;
+    } else {
+      process.env.OFFICE_TOOLS_SPEECH_FAKE = originalFakeMode;
+    }
     await rm(workspace, { force: true, recursive: true });
   }
 });

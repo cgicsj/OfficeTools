@@ -13,10 +13,18 @@ import type { SelectedFile, SelectedFolder } from './files';
 import type { JobEvent } from './jobs';
 import type { OpenDirectoryInput } from './paths';
 import type { SetLastOutputDirectoryInput } from './preferences';
+import type {
+  ExportSpeechTranscriptsInput,
+  ExportSpeechTranscriptsResult,
+  SpeechEvent,
+  SpeechTranscriptionJobResult,
+  StartSpeechTranscriptionInput,
+} from './speech';
 
 export type OfficeToolsApi = {
   dialog: {
     selectExcelFiles: () => Promise<ApiResult<SelectedFile[]>>;
+    selectAudioFiles: () => Promise<ApiResult<SelectedFile[]>>;
     selectFolder: () => Promise<ApiResult<SelectedFolder | undefined>>;
     selectOutputDirectory: () => Promise<ApiResult<string | undefined>>;
   };
@@ -38,6 +46,15 @@ export type OfficeToolsApi = {
     cancelActiveJob: () => Promise<ApiResult<void>>;
     skipCurrentFile: () => Promise<ApiResult<void>>;
     onJobEvent: (listener: (event: JobEvent) => void) => () => void;
+  };
+  speech: {
+    startTranscriptionJob: (
+      input: StartSpeechTranscriptionInput,
+    ) => Promise<ApiResult<SpeechTranscriptionJobResult>>;
+    exportTranscripts: (
+      input: ExportSpeechTranscriptsInput,
+    ) => Promise<ApiResult<ExportSpeechTranscriptsResult>>;
+    onSpeechEvent: (listener: (event: SpeechEvent) => void) => () => void;
   };
 };
 

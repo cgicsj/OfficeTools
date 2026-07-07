@@ -6,6 +6,7 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    extraResource: ['./resources/speech-helper'],
     executableName: 'office-tools',
     name: 'OfficeTools',
   },
@@ -18,8 +19,8 @@ const config: ForgeConfig = {
           name: 'office-tools',
           productName: 'OfficeTools',
           genericName: 'Office Document Tools',
-          description: 'Local Excel split and merge tools',
-          productDescription: 'OfficeTools provides local Excel split and merge workflows for .xls, .xlsx, and .et files.',
+          description: 'Local office document and speech tools',
+          productDescription: 'OfficeTools provides local Excel split/merge workflows and audio-file speech-to-text tools.',
           maintainer: 'OfficeTools Team',
           bin: 'office-tools',
           section: 'utils',

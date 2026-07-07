@@ -4,6 +4,9 @@ import path from 'node:path';
 type ElectronPathName = 'userData' | string;
 
 export const app = {
+  getAppPath(): string {
+    return process.cwd();
+  },
   getPath(name: ElectronPathName): string {
     if (name === 'userData') {
       return process.env.OFFICE_TOOLS_TEST_USER_DATA ?? path.join(tmpdir(), 'office-tools-functional-user-data');

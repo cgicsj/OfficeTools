@@ -1,6 +1,7 @@
 export const IPC_CHANNELS = {
   DIALOG: {
     SELECT_EXCEL_FILES: 'dialog:select-excel-files',
+    SELECT_AUDIO_FILES: 'dialog:select-audio-files',
     SELECT_FOLDER: 'dialog:select-folder',
     SELECT_OUTPUT_DIRECTORY: 'dialog:select-output-directory',
   },
@@ -20,6 +21,11 @@ export const IPC_CHANNELS = {
     CANCEL_ACTIVE: 'job:cancel-active',
     SKIP_CURRENT_FILE: 'job:skip-current-file',
     EVENT: 'job:event',
+  },
+  SPEECH: {
+    START_TRANSCRIPTION_JOB: 'speech:start-transcription-job',
+    EXPORT_TRANSCRIPTS: 'speech:export-transcripts',
+    EVENT: 'speech:event',
   },
 } as const;
 
