@@ -393,3 +393,35 @@ Moved split save selection into split settings, unified split and merge save-pat
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: Add local speech-to-text workflow
+
+**Date**: 2026-07-07
+**Task**: Add local speech-to-text workflow
+
+### Summary
+
+Completed the accuracy-first local speech-to-text workflow using the FunASR Python helper, added typed Electron IPC/preload contracts, renderer queue UI, export support, fake-helper functional coverage, packaging resource wiring, and backend service specs.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `24e7403` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
