@@ -425,3 +425,35 @@ Completed the accuracy-first local speech-to-text workflow using the FunASR Pyth
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: Add Excel and speech module tests
+
+**Date**: 2026-07-07
+**Task**: Add Excel and speech module tests
+
+### Summary
+
+Added service-level coverage for Excel metadata and merge-folder edge cases, strengthened speech fake-helper tests for queue continuation, duplicate TXT export naming, duration probing, and implemented the 4-hour long-audio confirmation guard plus related UI/export refinements.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `52b664d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
