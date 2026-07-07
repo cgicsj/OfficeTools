@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const preferencesFileSchema = z.object({
   lastOutputDirectory: z.string().min(1).optional(),
+  speechModelBaseUrl: z.string().min(1).optional(),
 });
 
 export const setLastOutputDirectoryInputSchema = z.object({

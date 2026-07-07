@@ -121,3 +121,61 @@ const result = await window.officeTools.speech.startTranscriptionJob({ sourceIds
 ```
 
 External helper integrations should preserve the existing OfficeTools flow: UI -> preload API -> IPC handler -> main service -> helper/process -> typed result/event -> UI.
+
+## Scenario: Speech Model Downloads
+
+### 1. Scope / Trigger
+
+Use this pattern when speech ASR models are too large for the installer and must be downloaded on first use while keeping inference local.
+
+### 2. Signatures
+
+- Default config resource: `resources/speech-models/config.json`.
+- Config shape: `{ "modelBaseUrl": string, "asrPackageName": string, "puncPackageName": string }`.
+- Main APIs: `getSpeechModelSettings()`, `updateSpeechModelSettings(modelBaseUrl)`, `getSpeechModelStatus()`, `ensureSpeechModels(emitProgress)`.
+- Preload APIs: `window.officeTools.speech.getModelSettings()`, `setModelSettings(input)`, `getModelStatus()`, and `ensureModels()`.
+
+### 3. Contracts
+
+- The renderer only receives model settings, readiness, and progress; it must not receive local model filesystem paths.
+- Model packages are downloaded and extracted by the main process into `app.getPath('userData')/speech-models`.
+- Package URLs are resolved as `<modelBaseUrl>/<packageName>`.
+- A package is valid when its root or single nested model directory contains `model.onnx` or `model_quant.onnx`.
+- The Python helper receives model paths through `OFFICE_TOOLS_FUNASR_ASR_MODEL_DIR` and `OFFICE_TOOLS_FUNASR_PUNC_MODEL_DIR`.
+
+### 4. Validation & Error Matrix
+
+- Invalid model settings input -> `ApiResult` failure with `INVALID_SPEECH_MODEL_SETTINGS_INPUT`.
+- Missing model packages or non-200 HTTP response -> user-facing model download failure; do not start transcription.
+- Zip path traversal -> reject extraction with a user-facing failure.
+- Missing ONNX model after extraction -> reject package and keep transcription blocked.
+- Existing local models -> skip download and start transcription normally.
+
+### 5. Good/Base/Bad Cases
+
+- Good: First speech conversion detects missing models, asks the user, shows progress, extracts models under userData, then continues local transcription.
+- Base: User updates the model base URL from the speech settings modal and the value persists across sessions.
+- Bad: Renderer downloads model files, hard-codes local model paths, or uploads user audio to a remote ASR service without an explicit cloud-mode design.
+
+### 6. Tests Required
+
+- Functional tests should use tiny local zip fixtures and `file://` model base URLs so CI does not require network or real model files.
+- Existing fake speech helper tests must keep working without downloaded models.
+- Build/package checks must include the default config resource through Electron Forge `extraResource`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```typescript
+// Renderer-owned download and local path exposure; do not do this.
+await fetch(modelUrl).then((response) => response.blob());
+window.officeTools.speech.startTranscriptionJob({ modelPath: '/home/user/model' });
+```
+
+#### Correct
+
+```typescript
+// Renderer asks main to ensure models; main owns paths and helper environment.
+const status = await window.officeTools.speech.ensureModels();
+```

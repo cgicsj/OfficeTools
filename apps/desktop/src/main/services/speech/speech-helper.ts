@@ -120,13 +120,17 @@ export const probeAudioDurationSeconds = async (audioPath: string): Promise<numb
   });
 };
 
-export const transcribeAudioFile = async (audioPath: string, signal: AbortSignal): Promise<SpeechHelperResult> => {
+export const transcribeAudioFile = async (
+  audioPath: string,
+  signal: AbortSignal,
+  extraEnv: NodeJS.ProcessEnv = {},
+): Promise<SpeechHelperResult> => {
   const helperPath = await resolveHelperPath();
   const pythonExecutable = process.env.OFFICE_TOOLS_PYTHON ?? 'python3';
 
   return await new Promise<SpeechHelperResult>((resolve, reject) => {
     const child = spawn(pythonExecutable, [helperPath, audioPath], {
-      env: process.env,
+      env: { ...process.env, ...extraEnv },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';

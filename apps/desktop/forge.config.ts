@@ -6,7 +6,7 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    extraResource: ['./resources/speech-helper'],
+    extraResource: ['./resources/speech-helper', './resources/speech-models'],
     executableName: 'office-tools',
     name: 'OfficeTools',
   },

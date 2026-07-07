@@ -1,0 +1,5 @@
+{
+  "modelBaseUrl": "https://2.22.2.2",
+  "asrPackageName": "funasr-asr-model.zip",
+  "puncPackageName": "funasr-punc-model.zip"
+}

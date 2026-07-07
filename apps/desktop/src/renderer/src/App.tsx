@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MergeMode, ParsedWorkbook, StartMergeJobInput, StartSplitJobInput } from '@shared/types/excel';
 import type { FileListItem, SelectedFile, SelectedFolder } from '@shared/types/files';
 import type { JobProgress, LogEntry, WorkflowTab } from '@shared/types/jobs';
-import type { SpeechDurationProbeItem, SpeechEvent, SpeechTranscriptionItem, SpeechTranscriptionProgress } from '@shared/types/speech';
+import type { SpeechDurationProbeItem, SpeechEvent, SpeechModelSettings, SpeechTranscriptionItem, SpeechTranscriptionProgress } from '@shared/types/speech';
 import { APP_CONFIG } from '@shared/constants/config';
 import { AppShell } from './components/layout/AppShell';
 import type { AppModule } from './components/layout/AppShell';
@@ -46,6 +46,10 @@ type CompletionDialogState = {
 type LongSpeechConfirmationState = {
   sourceIds: string[];
   longFiles: SpeechDurationProbeItem[];
+};
+
+type ModelDownloadConfirmationState = {
+  sourceIds: string[];
 };
 
 type SpeechLogEntry = {
@@ -142,6 +146,9 @@ export const App = (): JSX.Element => {
   const [speechLogs, setSpeechLogs] = useState<SpeechLogEntry[]>([]);
   const [isSpeechBusy, setIsSpeechBusy] = useState(false);
   const [longSpeechConfirmation, setLongSpeechConfirmation] = useState<LongSpeechConfirmationState | null>(null);
+  const [modelDownloadConfirmation, setModelDownloadConfirmation] = useState<ModelDownloadConfirmationState | null>(null);
+  const [speechModelSettings, setSpeechModelSettings] = useState<SpeechModelSettings | null>(null);
+  const [speechModelBaseUrlDraft, setSpeechModelBaseUrlDraft] = useState('');
 
   const appendLog = useCallback((tab: WorkflowTab, level: LogEntry['level'], message: string): void => {
     setLogs((currentLogs) => ({
@@ -249,6 +256,21 @@ export const App = (): JSX.Element => {
             timestampMs: event.timestampMs,
           },
         ]);
+        return;
+      }
+
+      if (event.type === 'model-download-progress') {
+        const percentText = event.progress.percent === undefined ? '' : ` ${event.progress.percent}%`;
+        const phaseText = event.progress.phase === 'downloading'
+          ? '正在下载'
+          : event.progress.phase === 'extracting'
+            ? '正在解压'
+            : '下载完成';
+        setSpeechProgress({
+          currentFileIndex: 0,
+          message: `${phaseText} ${event.progress.packageName}${percentText}`,
+          totalFiles: 0,
+        });
         return;
       }
 
@@ -1059,6 +1081,17 @@ export const App = (): JSX.Element => {
         return;
       }
 
+      const modelStatus = await window.officeTools.speech.getModelStatus();
+      if (modelStatus.success === false) {
+        appendSpeechLog('error', modelStatus.error);
+        return;
+      }
+
+      if (!modelStatus.data.ready) {
+        setModelDownloadConfirmation({ sourceIds });
+        return;
+      }
+
       const result = await window.officeTools.speech.probeDurations({ sourceIds });
       if (result.success === false) {
         appendSpeechLog('error', result.error);
@@ -1103,6 +1136,65 @@ export const App = (): JSX.Element => {
     appendSpeechLog('warning', '已取消超长音频转写');
   }, [appendSpeechLog]);
 
+  const continueModelDownload = useCallback(async (): Promise<void> => {
+    const confirmation = modelDownloadConfirmation;
+    if (!confirmation) {
+      return;
+    }
+
+    setModelDownloadConfirmation(null);
+    setIsSpeechBusy(true);
+    appendSpeechLog('info', '开始下载语音模型，下载完成后将继续转写');
+
+    try {
+      const result = await window.officeTools.speech.ensureModels();
+      if (result.success === false) {
+        appendSpeechLog('error', result.error);
+        return;
+      }
+
+      appendSpeechLog('success', '语音模型下载完成');
+      await requestSpeechTranscription(confirmation.sourceIds);
+    } finally {
+      setIsSpeechBusy(false);
+    }
+  }, [appendSpeechLog, modelDownloadConfirmation, requestSpeechTranscription]);
+
+  const cancelModelDownload = useCallback((): void => {
+    setModelDownloadConfirmation(null);
+    appendSpeechLog('warning', '已取消语音模型下载和本次转写');
+  }, [appendSpeechLog]);
+
+  const openSpeechModelSettings = useCallback(async (): Promise<void> => {
+    const result = await window.officeTools.speech.getModelSettings();
+    if (result.success === false) {
+      appendSpeechLog('error', result.error);
+      return;
+    }
+
+    setSpeechModelSettings(result.data);
+    setSpeechModelBaseUrlDraft(result.data.modelBaseUrl);
+  }, [appendSpeechLog]);
+
+  const closeSpeechModelSettings = useCallback((): void => {
+    setSpeechModelSettings(null);
+    setSpeechModelBaseUrlDraft('');
+  }, []);
+
+  const saveSpeechModelSettings = useCallback(async (): Promise<void> => {
+    const result = await window.officeTools.speech.setModelSettings({
+      modelBaseUrl: speechModelBaseUrlDraft.trim(),
+    });
+    if (result.success === false) {
+      appendSpeechLog('error', result.error);
+      return;
+    }
+
+    setSpeechModelSettings(null);
+    setSpeechModelBaseUrlDraft('');
+    appendSpeechLog('success', '模型下载地址已保存');
+  }, [appendSpeechLog, speechModelBaseUrlDraft]);
+
   const cancelSpeechTranscription = useCallback(async (): Promise<void> => {
     const result = await window.officeTools.jobs.cancelActiveJob();
     if (result.success === false) {
@@ -1125,12 +1217,12 @@ export const App = (): JSX.Element => {
     );
     setSpeechProgress({
       ...idleSpeechProgress,
-      totalFiles: speechFiles.length,
+      totalFiles: 0,
       message: '用户已取消',
     });
     setIsSpeechBusy(false);
     appendSpeechLog('warning', '用户已取消语音转文字任务');
-  }, [appendSpeechLog, speechFiles.length]);
+  }, [appendSpeechLog]);
 
   const copySpeechTranscript = useCallback(
     async (sourceId: string): Promise<void> => {
@@ -1245,6 +1337,9 @@ export const App = (): JSX.Element => {
             onExport={() => {
               void exportSpeechTranscripts();
             }}
+            onOpenSettings={() => {
+              void openSpeechModelSettings();
+            }}
             onRemoveFile={removeSpeechFile}
             onRetryFile={retrySpeechFile}
             onSelectFiles={selectSpeechFiles}
@@ -1315,6 +1410,37 @@ export const App = (): JSX.Element => {
             ? `${completionDialog.warning} 任务已完成，输出目录：${completionDialog.outputDirectory || '-'}`
             : `任务已完成，输出目录：${completionDialog.outputDirectory || '-'}`}
           title="任务完成"
+        />
+      ) : null}
+      {speechModelSettings ? (
+        <ModalDialog
+          actions={[
+            { label: '取消', onClick: closeSpeechModelSettings },
+            { label: '保存', onClick: () => { void saveSpeechModelSettings(); }, variant: 'primary' },
+          ]}
+          description={`默认地址：${speechModelSettings.defaultModelBaseUrl}。修改后会作为后续模型下载地址。`}
+          title="语音模型设置"
+        >
+          <label className="modal-field">
+            <span>模型下载地址</span>
+            <input
+              className="modal-field__input"
+              onChange={(event) => setSpeechModelBaseUrlDraft(event.target.value)}
+              placeholder="https://2.22.2.2"
+              type="url"
+              value={speechModelBaseUrlDraft}
+            />
+          </label>
+        </ModalDialog>
+      ) : null}
+      {modelDownloadConfirmation ? (
+        <ModalDialog
+          actions={[
+            { label: '取消转换', onClick: cancelModelDownload },
+            { label: '下载并继续', onClick: () => { void continueModelDownload(); }, variant: 'primary' },
+          ]}
+          description="首次使用语音转文字需要下载本地 ASR 模型。模型下载完成后将缓存在本机，后续可离线转写。"
+          title="需要下载语音模型"
         />
       ) : null}
       {longSpeechConfirmation ? (

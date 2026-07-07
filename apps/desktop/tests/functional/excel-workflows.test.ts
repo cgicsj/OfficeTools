@@ -3,6 +3,7 @@ import * as nodeFs from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
@@ -14,6 +15,7 @@ import { runMergeJob } from '../../src/main/services/excel/merge-job';
 import { parseMergeFolder } from '../../src/main/services/excel/merge-folder';
 import { runSplitJob } from '../../src/main/services/excel/split-job';
 import { exportSpeechTranscripts, probeSpeechAudioDurations, runSpeechTranscriptionJob } from '../../src/main/services/speech/speech-job';
+import { ensureSpeechModels, getSpeechModelStatus, updateSpeechModelSettings } from '../../src/main/services/speech/speech-models';
 import type { JobEvent } from '../../src/shared/types/jobs';
 import type { SelectedFile } from '../../src/shared/types/files';
 import type { SpeechEvent } from '../../src/shared/types/speech';
@@ -241,6 +243,48 @@ test('scans merge folders recursively and reports invalid workbook failures', as
     assert.equal(result.failures[0]?.fileName, 'invalid.xls');
     assert.equal(result.failures[0]?.error, 'XLS 文件格式无效，请另存为 .xlsx 后重试');
   } finally {
+    await rm(workspace, { force: true, recursive: true });
+  }
+});
+
+
+test('downloads and extracts speech model packages from configured address', async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), 'office-tools-models-'));
+  const originalUserData = process.env.OFFICE_TOOLS_TEST_USER_DATA;
+
+  try {
+    process.env.OFFICE_TOOLS_TEST_USER_DATA = path.join(workspace, 'user-data');
+    const remoteDirectory = path.join(workspace, 'remote');
+    await mkdir(remoteDirectory, { recursive: true });
+
+    const createModelPackage = async (packagePath: string, entryPath: string): Promise<void> => {
+      const zip = new JSZip();
+      zip.file(entryPath, 'fake onnx content');
+      await writeFile(packagePath, await zip.generateAsync({ type: 'nodebuffer' }));
+    };
+
+    await createModelPackage(path.join(remoteDirectory, 'funasr-asr-model.zip'), 'asr-model/model_quant.onnx');
+    await createModelPackage(path.join(remoteDirectory, 'funasr-punc-model.zip'), 'punc-model/model.onnx');
+
+    await updateSpeechModelSettings(pathToFileURL(remoteDirectory).toString());
+    const beforeStatus = await getSpeechModelStatus();
+    assert.equal(beforeStatus.ready, false);
+
+    const progressPackages: string[] = [];
+    const afterStatus = await ensureSpeechModels((progress) => {
+      if (progress.phase === 'completed') {
+        progressPackages.push(progress.packageName);
+      }
+    });
+
+    assert.equal(afterStatus.ready, true);
+    assert.deepEqual(progressPackages.sort(), ['funasr-asr-model.zip', 'funasr-punc-model.zip']);
+  } finally {
+    if (originalUserData === undefined) {
+      delete process.env.OFFICE_TOOLS_TEST_USER_DATA;
+    } else {
+      process.env.OFFICE_TOOLS_TEST_USER_DATA = originalUserData;
+    }
     await rm(workspace, { force: true, recursive: true });
   }
 });

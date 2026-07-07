@@ -17,6 +17,9 @@ import type {
   ExportSpeechTranscriptsInput,
   ExportSpeechTranscriptsResult,
   ProbeSpeechDurationsInput,
+  SetSpeechModelSettingsInput,
+  SpeechModelSettings,
+  SpeechModelStatus,
   ProbeSpeechDurationsResult,
   SpeechEvent,
   SpeechTranscriptionJobResult,
@@ -50,6 +53,10 @@ export type OfficeToolsApi = {
     onJobEvent: (listener: (event: JobEvent) => void) => () => void;
   };
   speech: {
+    getModelSettings: () => Promise<ApiResult<SpeechModelSettings>>;
+    setModelSettings: (input: SetSpeechModelSettingsInput) => Promise<ApiResult<SpeechModelSettings>>;
+    getModelStatus: () => Promise<ApiResult<SpeechModelStatus>>;
+    ensureModels: () => Promise<ApiResult<SpeechModelStatus>>;
     probeDurations: (input: ProbeSpeechDurationsInput) => Promise<ApiResult<ProbeSpeechDurationsResult>>;
     startTranscriptionJob: (
       input: StartSpeechTranscriptionInput,

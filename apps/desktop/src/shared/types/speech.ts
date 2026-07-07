@@ -15,6 +15,33 @@ export type SpeechTranscriptionItem = SpeechAudioFile & {
   confidence?: number;
 };
 
+
+export type SpeechModelSettings = {
+  modelBaseUrl: string;
+  defaultModelBaseUrl: string;
+  asrPackageName: string;
+  puncPackageName: string;
+};
+
+export type SetSpeechModelSettingsInput = {
+  modelBaseUrl: string;
+};
+
+export type SpeechModelStatus = {
+  ready: boolean;
+  asrReady: boolean;
+  puncReady: boolean;
+  modelBaseUrl: string;
+};
+
+export type SpeechModelDownloadProgress = {
+  packageName: string;
+  phase: 'downloading' | 'extracting' | 'completed';
+  downloadedBytes: number;
+  totalBytes?: number;
+  percent?: number;
+};
+
 export type StartSpeechTranscriptionInput = {
   sourceIds: string[];
 };
@@ -63,6 +90,10 @@ export type SpeechEvent =
       progress: SpeechTranscriptionProgress;
     }
   | {
+      type: 'model-download-progress';
+      progress: SpeechModelDownloadProgress;
+    }
+  | {
       type: 'log';
       level: 'info' | 'success' | 'warning' | 'error';
       message: string;
@@ -87,6 +118,10 @@ export type ExportSpeechTranscriptsResult = {
     path: string;
   }>;
 };
+
+export const setSpeechModelSettingsInputSchema = z.object({
+  modelBaseUrl: z.string().url(),
+});
 
 export const probeSpeechDurationsInputSchema = z.object({
   sourceIds: z.array(z.string().min(1)).min(1),

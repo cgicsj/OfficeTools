@@ -43,3 +43,16 @@ export const setLastOutputDirectory = async (directory: string): Promise<void> =
   });
 };
 
+
+export const getSpeechModelBaseUrl = async (): Promise<string | undefined> => {
+  const preferences = await readPreferences();
+  return preferences.speechModelBaseUrl;
+};
+
+export const setSpeechModelBaseUrl = async (modelBaseUrl: string): Promise<void> => {
+  const preferences = await readPreferences();
+  await writePreferences({
+    ...preferences,
+    speechModelBaseUrl: modelBaseUrl,
+  });
+};

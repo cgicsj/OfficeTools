@@ -512,3 +512,22 @@
 .speech-result-card__error {
   color: var(--color-error);
 }
+
+.modal-field {
+  display: grid;
+  gap: 6px;
+}
+
+.modal-field span {
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.modal-field__input {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  min-height: 36px;
+  padding: 0 10px;
+}

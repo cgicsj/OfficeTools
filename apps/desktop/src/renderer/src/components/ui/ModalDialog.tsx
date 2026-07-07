@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { Button } from './Button';
 import type { ButtonVariant } from './Button';
 
@@ -11,11 +11,12 @@ type ModalDialogAction = {
 
 type ModalDialogProps = {
   actions: ModalDialogAction[];
+  children?: ReactNode;
   description: string;
   title: string;
 };
 
-export const ModalDialog = ({ actions, description, title }: ModalDialogProps): JSX.Element => {
+export const ModalDialog = ({ actions, children, description, title }: ModalDialogProps): JSX.Element => {
   const titleId = useId();
   const descriptionId = useId();
 
@@ -31,6 +32,7 @@ export const ModalDialog = ({ actions, description, title }: ModalDialogProps): 
         <div className="modal-dialog__body">
           <h2 id={titleId}>{title}</h2>
           <p id={descriptionId}>{description}</p>
+          {children}
         </div>
         <div className="modal-dialog__actions">
           {actions.map((action) => (

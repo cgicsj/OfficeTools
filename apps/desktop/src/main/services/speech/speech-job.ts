@@ -14,6 +14,7 @@ import { APP_CONFIG } from '../../../shared/constants/config';
 import { getRegisteredFilePath } from '../file-selection/file-registry';
 import { setActiveJobAbortController } from '../jobs/job-cancellation';
 import { probeAudioDurationSeconds, transcribeAudioFile } from './speech-helper';
+import { getSpeechModelEnvironment } from './speech-models';
 
 type EmitSpeechEvent = (event: SpeechEvent) => void;
 
@@ -114,6 +115,7 @@ export const runSpeechTranscriptionJob = async (
   setActiveJobAbortController(abortController);
 
   const items = await Promise.all(input.sourceIds.map((sourceId) => createItem(sourceId)));
+  const modelEnvironment = process.env.OFFICE_TOOLS_SPEECH_FAKE === '1' ? {} : await getSpeechModelEnvironment();
   const resultItems: SpeechTranscriptionItem[] = [];
 
   try {
@@ -155,7 +157,7 @@ export const runSpeechTranscriptionJob = async (
           throw new Error('音频文件引用已失效，请重新选择文件');
         }
 
-        const helperResult = await transcribeAudioFile(filePath, abortController.signal);
+        const helperResult = await transcribeAudioFile(filePath, abortController.signal, modelEnvironment);
         const completedItem = markItem(processingItem, 'completed', {
           transcript: helperResult.text,
           rawText: helperResult.rawText,

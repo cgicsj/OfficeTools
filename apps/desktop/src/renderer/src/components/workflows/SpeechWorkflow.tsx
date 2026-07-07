@@ -1,4 +1,4 @@
-import { ClipboardCopy, Copy, Download, FileAudio2, FolderOpen, Play, RotateCcw, Square } from 'lucide-react';
+import { ClipboardCopy, Copy, Download, FileAudio2, FolderOpen, Play, RotateCcw, Settings, Square } from 'lucide-react';
 import type { SpeechTranscriptionItem, SpeechTranscriptionProgress } from '@shared/types/speech';
 import { formatBytes } from '../../lib/format';
 import { Button } from '../ui/Button';
@@ -21,6 +21,7 @@ type SpeechWorkflowProps = {
   onExport: () => void;
   onRemoveFile: (sourceId: string) => void;
   onRetryFile: (sourceId: string) => void;
+  onOpenSettings: () => void;
   onSelectFiles: () => void;
   onSelectOutputDirectory: () => void;
   onStart: () => void;
@@ -53,6 +54,7 @@ export const SpeechWorkflow = ({
   onCopyAll,
   onCopyTranscript,
   onExport,
+  onOpenSettings,
   onRemoveFile,
   onRetryFile,
   onSelectFiles,
@@ -95,6 +97,9 @@ export const SpeechWorkflow = ({
         </Button>
         <Button disabled={!canExport} icon={<Download size={16} aria-hidden="true" />} onClick={onExport}>
           导出 TXT
+        </Button>
+        <Button disabled={isBusy} icon={<Settings size={16} aria-hidden="true" />} onClick={onOpenSettings}>
+          模型设置
         </Button>
         <div className="output-path speech-workflow__output" title={outputDirectory || '未设置保存路径'}>
           保存路径：{outputDirectory || '未设置'}
