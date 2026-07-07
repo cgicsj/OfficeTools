@@ -1,8 +1,10 @@
-import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { access, mkdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type {
   ExportSpeechTranscriptsInput,
   ExportSpeechTranscriptsResult,
+  ProbeSpeechDurationsInput,
+  ProbeSpeechDurationsResult,
   SpeechEvent,
   SpeechTranscriptionItem,
   SpeechTranscriptionJobResult,
@@ -11,7 +13,7 @@ import type {
 import { APP_CONFIG } from '../../../shared/constants/config';
 import { getRegisteredFilePath } from '../file-selection/file-registry';
 import { setActiveJobAbortController } from '../jobs/job-cancellation';
-import { transcribeAudioFile } from './speech-helper';
+import { probeAudioDurationSeconds, transcribeAudioFile } from './speech-helper';
 
 type EmitSpeechEvent = (event: SpeechEvent) => void;
 
@@ -78,6 +80,30 @@ const summarize = (items: SpeechTranscriptionItem[]): SpeechTranscriptionJobResu
 
 export const isSpeechJobCanceledError = (error: unknown): boolean => {
   return error instanceof SpeechJobCanceledError;
+};
+
+
+export const probeSpeechAudioDurations = async (
+  input: ProbeSpeechDurationsInput,
+): Promise<ProbeSpeechDurationsResult> => {
+  const items: ProbeSpeechDurationsResult['items'] = [];
+
+  for (const sourceId of input.sourceIds) {
+    const filePath = getRegisteredFilePath(sourceId);
+    if (!filePath) {
+      throw new Error('音频文件引用已失效，请重新选择文件');
+    }
+
+    const durationSeconds = await probeAudioDurationSeconds(filePath);
+    items.push({
+      sourceId,
+      name: path.basename(filePath),
+      durationSeconds,
+      isLongDuration: durationSeconds > APP_CONFIG.LIMITS.SPEECH_LONG_AUDIO_THRESHOLD_SECONDS,
+    });
+  }
+
+  return { items };
 };
 
 export const runSpeechTranscriptionJob = async (
@@ -181,14 +207,44 @@ const sanitizeBaseName = (name: string): string => {
   return sanitized || 'transcript';
 };
 
+const fileExists = async (filePath: string): Promise<boolean> => {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const createUniqueTranscriptPath = async (
+  outputDirectory: string,
+  baseName: string,
+  usedPaths: Set<string>,
+): Promise<string> => {
+  let suffix = 0;
+
+  while (true) {
+    const fileName = suffix === 0 ? `${baseName}.txt` : `${baseName}-${suffix + 1}.txt`;
+    const targetPath = path.join(outputDirectory, fileName);
+
+    if (!usedPaths.has(targetPath) && !(await fileExists(targetPath))) {
+      usedPaths.add(targetPath);
+      return targetPath;
+    }
+
+    suffix += 1;
+  }
+};
+
 export const exportSpeechTranscripts = async (
   input: ExportSpeechTranscriptsInput,
 ): Promise<ExportSpeechTranscriptsResult> => {
   await mkdir(input.outputDirectory, { recursive: true });
   const files: ExportSpeechTranscriptsResult['files'] = [];
+  const usedPaths = new Set<string>();
 
   for (const item of input.items) {
-    const targetPath = path.join(input.outputDirectory, `${sanitizeBaseName(item.name)}.txt`);
+    const targetPath = await createUniqueTranscriptPath(input.outputDirectory, sanitizeBaseName(item.name), usedPaths);
     await writeFile(targetPath, item.transcript, 'utf8');
     files.push({
       sourceId: item.sourceId,

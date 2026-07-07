@@ -19,6 +19,21 @@ export type StartSpeechTranscriptionInput = {
   sourceIds: string[];
 };
 
+export type ProbeSpeechDurationsInput = {
+  sourceIds: string[];
+};
+
+export type SpeechDurationProbeItem = {
+  sourceId: string;
+  name: string;
+  durationSeconds: number;
+  isLongDuration: boolean;
+};
+
+export type ProbeSpeechDurationsResult = {
+  items: SpeechDurationProbeItem[];
+};
+
 export type SpeechTranscriptionSummary = {
   totalFiles: number;
   completedFiles: number;
@@ -72,6 +87,10 @@ export type ExportSpeechTranscriptsResult = {
     path: string;
   }>;
 };
+
+export const probeSpeechDurationsInputSchema = z.object({
+  sourceIds: z.array(z.string().min(1)).min(1),
+});
 
 export const startSpeechTranscriptionInputSchema = z.object({
   sourceIds: z.array(z.string().min(1)).min(1),

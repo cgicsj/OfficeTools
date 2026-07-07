@@ -76,7 +76,7 @@ Use this pattern when a feature needs a privileged or heavyweight runtime outsid
 - Request fields crossing IPC must live under `apps/desktop/src/shared/types` and include Zod schemas.
 - Renderer sends stable metadata IDs such as `sourceId`; main services resolve real filesystem paths through registries.
 - Helper result JSON must include a success discriminator: `{ "success": true, ... }` or `{ "success": false, "error": string, "code"?: string }`.
-- Runtime env keys must be explicit and documented near the helper service. For speech helpers, examples include `OFFICE_TOOLS_PYTHON`, `OFFICE_TOOLS_SPEECH_FAKE`, and model directory variables.
+- Runtime env keys must be explicit and documented near the helper service. For speech helpers, examples include `OFFICE_TOOLS_PYTHON`, `OFFICE_TOOLS_SPEECH_FAKE`, `OFFICE_TOOLS_SPEECH_FAKE_DURATION_SECONDS`, and model directory variables.
 - Packaged helper files must be included as Electron resources, not assumed to be importable from renderer code.
 - Helper path resolution should check dev workspace paths, `app.getAppPath()`, and `process.resourcesPath`; guard `process.resourcesPath` because Node-based tests may run outside packaged Electron.
 

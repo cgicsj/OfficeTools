@@ -3,7 +3,7 @@ import { IPC_CHANNELS } from '../shared/constants/channels';
 import type { JobEvent } from '../shared/types/jobs';
 import type { OfficeToolsApi } from '../shared/types/ipc';
 import type { SetLastOutputDirectoryInput } from '../shared/types/preferences';
-import type { ExportSpeechTranscriptsInput, SpeechEvent, StartSpeechTranscriptionInput } from '../shared/types/speech';
+import type { ExportSpeechTranscriptsInput, ProbeSpeechDurationsInput, SpeechEvent, StartSpeechTranscriptionInput } from '../shared/types/speech';
 
 const officeToolsApi: OfficeToolsApi = {
   dialog: {
@@ -42,6 +42,8 @@ const officeToolsApi: OfficeToolsApi = {
     },
   },
   speech: {
+    probeDurations: (input: ProbeSpeechDurationsInput) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SPEECH.PROBE_DURATIONS, input),
     startTranscriptionJob: (input: StartSpeechTranscriptionInput) =>
       ipcRenderer.invoke(IPC_CHANNELS.SPEECH.START_TRANSCRIPTION_JOB, input),
     exportTranscripts: (input: ExportSpeechTranscriptsInput) =>

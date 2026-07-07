@@ -16,6 +16,8 @@ import type { SetLastOutputDirectoryInput } from './preferences';
 import type {
   ExportSpeechTranscriptsInput,
   ExportSpeechTranscriptsResult,
+  ProbeSpeechDurationsInput,
+  ProbeSpeechDurationsResult,
   SpeechEvent,
   SpeechTranscriptionJobResult,
   StartSpeechTranscriptionInput,
@@ -48,6 +50,7 @@ export type OfficeToolsApi = {
     onJobEvent: (listener: (event: JobEvent) => void) => () => void;
   };
   speech: {
+    probeDurations: (input: ProbeSpeechDurationsInput) => Promise<ApiResult<ProbeSpeechDurationsResult>>;
     startTranscriptionJob: (
       input: StartSpeechTranscriptionInput,
     ) => Promise<ApiResult<SpeechTranscriptionJobResult>>;

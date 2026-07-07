@@ -2,15 +2,47 @@ import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/constants/channels';
 import {
   exportSpeechTranscriptsInputSchema,
+  probeSpeechDurationsInputSchema,
   startSpeechTranscriptionInputSchema,
 } from '../../shared/types/speech';
 import {
   exportSpeechTranscripts,
+  probeSpeechAudioDurations,
   isSpeechJobCanceledError,
   runSpeechTranscriptionJob,
 } from '../services/speech/speech-job';
 
 export const setupSpeechHandlers = (): void => {
+  ipcMain.handle(IPC_CHANNELS.SPEECH.PROBE_DURATIONS, async (_event, input: unknown) => {
+    const parsedInput = probeSpeechDurationsInputSchema.safeParse(input);
+    if (parsedInput.success === false) {
+      return {
+        success: false,
+        error: 'Invalid speech duration probe input',
+        code: 'INVALID_SPEECH_DURATION_PROBE_INPUT',
+      };
+    }
+
+    try {
+      const result = await probeSpeechAudioDurations(parsedInput.data);
+      return { success: true, data: result };
+    } catch (error) {
+      if (error instanceof Error && error.message) {
+        return {
+          success: false,
+          error: error.message,
+          code: 'SPEECH_DURATION_PROBE_FAILED',
+        };
+      }
+
+      return {
+        success: false,
+        error: '读取音频时长失败',
+        code: 'SPEECH_DURATION_PROBE_FAILED',
+      };
+    }
+  });
+
   ipcMain.handle(IPC_CHANNELS.SPEECH.START_TRANSCRIPTION_JOB, async (event, input: unknown) => {
     const parsedInput = startSpeechTranscriptionInputSchema.safeParse(input);
     if (parsedInput.success === false) {

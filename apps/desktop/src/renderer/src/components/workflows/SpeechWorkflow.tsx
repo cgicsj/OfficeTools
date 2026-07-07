@@ -88,7 +88,7 @@ export const SpeechWorkflow = ({
           取消
         </Button>
         <Button disabled={completedCount === 0} icon={<ClipboardCopy size={16} aria-hidden="true" />} onClick={onCopyAll}>
-          复制全部
+          复制全部已完成文本
         </Button>
         <Button disabled={isBusy} icon={<FolderOpen size={16} aria-hidden="true" />} onClick={onSelectOutputDirectory}>
           选择保存路径

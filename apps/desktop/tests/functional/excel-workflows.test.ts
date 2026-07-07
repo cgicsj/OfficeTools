@@ -8,11 +8,12 @@ import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import * as cpexcel from 'xlsx/dist/cpexcel.full.mjs';
-import { registerSelectedFiles } from '../../src/main/services/file-selection/file-registry';
+import { registerFolder, registerSelectedFiles } from '../../src/main/services/file-selection/file-registry';
 import { parseSplitDocumentMetadata } from '../../src/main/services/excel/split-metadata';
 import { runMergeJob } from '../../src/main/services/excel/merge-job';
+import { parseMergeFolder } from '../../src/main/services/excel/merge-folder';
 import { runSplitJob } from '../../src/main/services/excel/split-job';
-import { exportSpeechTranscripts, runSpeechTranscriptionJob } from '../../src/main/services/speech/speech-job';
+import { exportSpeechTranscripts, probeSpeechAudioDurations, runSpeechTranscriptionJob } from '../../src/main/services/speech/speech-job';
 import type { JobEvent } from '../../src/shared/types/jobs';
 import type { SelectedFile } from '../../src/shared/types/files';
 import type { SpeechEvent } from '../../src/shared/types/speech';
@@ -189,14 +190,21 @@ test('parses metadata for null xlsx cells and legacy workbook files', async () =
     const xlsxPath = path.join(workspace, 'nullable.xlsx');
     const xlsPath = path.join(workspace, 'legacy.xls');
     const etPath = path.join(workspace, 'legacy.et');
+    const invalidXlsPath = path.join(workspace, 'invalid.xls');
     await createNullableFormulaWorkbook(xlsxPath);
     createLegacyWorkbook(xlsPath);
     createLegacyWorkbook(etPath);
+    await writeFile(invalidXlsPath, 'not a workbook');
 
-    const selectedFiles = await registerSelectedFiles([xlsxPath, xlsPath, etPath]);
-    const metadata = await parseSplitDocumentMetadata(selectedFiles.map((file) => file.sourceId));
+    const selectedFiles = await registerSelectedFiles([xlsxPath, xlsPath, etPath, invalidXlsPath]);
+    const metadata = await parseSplitDocumentMetadata([
+      ...selectedFiles.map((file) => file.sourceId),
+      'missing-source-id',
+    ]);
 
-    assert.deepEqual(metadata.failures, []);
+    assert.equal(metadata.failures.length, 2);
+    assert.equal(metadata.failures.find((failure) => failure.fileName === 'invalid.xls')?.error, 'XLS 文件格式无效，请另存为 .xlsx 后重试');
+    assert.equal(metadata.failures.find((failure) => failure.sourceId === 'missing-source-id')?.error, '找不到已选择文件，请重新选择文件');
     assert.equal(metadata.workbooks.length, 3);
     assert.deepEqual(
       metadata.workbooks.map((workbook) => workbook.fileName).sort(),
@@ -206,12 +214,42 @@ test('parses metadata for null xlsx cells and legacy workbook files', async () =
   } finally {
     await rm(workspace, { force: true, recursive: true });
   }
+ });
+
+
+test('scans merge folders recursively and reports invalid workbook failures', async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), 'office-tools-merge-folder-'));
+
+  try {
+    const nestedDirectory = path.join(workspace, 'nested');
+    await mkdir(nestedDirectory, { recursive: true });
+    const validWorkbookPath = path.join(nestedDirectory, 'valid.xlsx');
+    const invalidWorkbookPath = path.join(workspace, 'invalid.xls');
+    const ignoredTextPath = path.join(workspace, 'ignored.txt');
+    await createSourceWorkbook(validWorkbookPath);
+    await writeFile(invalidWorkbookPath, 'not a workbook');
+    await writeFile(ignoredTextPath, 'not excel');
+
+    const selectedFolder = await registerFolder(workspace);
+    const result = await parseMergeFolder(selectedFolder.sourceId);
+
+    assert.deepEqual(result.excludedFiles, []);
+    assert.equal(result.files.length, 1);
+    assert.equal(result.files[0]?.name, 'valid.xlsx');
+    assert.deepEqual(result.workbooks.map((workbook) => workbook.fileName), ['valid.xlsx']);
+    assert.equal(result.failures.length, 1);
+    assert.equal(result.failures[0]?.fileName, 'invalid.xls');
+    assert.equal(result.failures[0]?.error, 'XLS 文件格式无效，请另存为 .xlsx 后重试');
+  } finally {
+    await rm(workspace, { force: true, recursive: true });
+  }
 });
 
 
 test('transcribes speech files with fake helper and continues after unsupported files', async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), 'office-tools-speech-'));
   const originalFakeMode = process.env.OFFICE_TOOLS_SPEECH_FAKE;
+  const originalFakeDuration = process.env.OFFICE_TOOLS_SPEECH_FAKE_DURATION_SECONDS;
 
   try {
     process.env.OFFICE_TOOLS_SPEECH_FAKE = '1';
@@ -223,6 +261,14 @@ test('transcribes speech files with fake helper and continues after unsupported 
     await writeFile(secondAudioPath, 'fake flac content');
 
     const selectedFiles = await registerSelectedFiles([firstAudioPath, unsupportedPath, secondAudioPath]);
+    process.env.OFFICE_TOOLS_SPEECH_FAKE_DURATION_SECONDS = String((4 * 60 * 60) + 1);
+    const durationProbe = await probeSpeechAudioDurations({
+      sourceIds: [selectedFiles[0]?.sourceId ?? ''],
+    });
+    assert.equal(durationProbe.items[0]?.isLongDuration, true);
+    assert.equal(durationProbe.items[0]?.durationSeconds, (4 * 60 * 60) + 1);
+    delete process.env.OFFICE_TOOLS_SPEECH_FAKE_DURATION_SECONDS;
+
     const events: SpeechEvent[] = [];
     const result = await runSpeechTranscriptionJob(
       {
@@ -257,11 +303,38 @@ test('transcribes speech files with fake helper and continues after unsupported 
 
     assert.equal(exportResult.files.length, 2);
     assert.match(await readFile(exportResult.files[0]?.path ?? '', 'utf8'), /meeting\.wav/);
+
+    const duplicateExportResult = await exportSpeechTranscripts({
+      outputDirectory,
+      items: [
+        {
+          name: 'meeting.wav',
+          sourceId: 'duplicate-one',
+          transcript: 'first duplicate transcript',
+        },
+        {
+          name: 'meeting.wav',
+          sourceId: 'duplicate-two',
+          transcript: 'second duplicate transcript',
+        },
+      ],
+    });
+
+    assert.deepEqual(
+      duplicateExportResult.files.map((file) => path.basename(file.path)),
+      ['meeting-2.txt', 'meeting-3.txt'],
+    );
+    assert.match(await readFile(duplicateExportResult.files[1]?.path ?? '', 'utf8'), /second duplicate/);
   } finally {
     if (originalFakeMode === undefined) {
       delete process.env.OFFICE_TOOLS_SPEECH_FAKE;
     } else {
       process.env.OFFICE_TOOLS_SPEECH_FAKE = originalFakeMode;
+    }
+    if (originalFakeDuration === undefined) {
+      delete process.env.OFFICE_TOOLS_SPEECH_FAKE_DURATION_SECONDS;
+    } else {
+      process.env.OFFICE_TOOLS_SPEECH_FAKE_DURATION_SECONDS = originalFakeDuration;
     }
     await rm(workspace, { force: true, recursive: true });
   }

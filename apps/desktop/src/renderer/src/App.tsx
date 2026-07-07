@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MergeMode, ParsedWorkbook, StartMergeJobInput, StartSplitJobInput } from '@shared/types/excel';
 import type { FileListItem, SelectedFile, SelectedFolder } from '@shared/types/files';
 import type { JobProgress, LogEntry, WorkflowTab } from '@shared/types/jobs';
-import type { SpeechEvent, SpeechTranscriptionItem, SpeechTranscriptionProgress } from '@shared/types/speech';
+import type { SpeechDurationProbeItem, SpeechEvent, SpeechTranscriptionItem, SpeechTranscriptionProgress } from '@shared/types/speech';
 import { APP_CONFIG } from '@shared/constants/config';
 import { AppShell } from './components/layout/AppShell';
 import type { AppModule } from './components/layout/AppShell';
@@ -41,6 +41,11 @@ type CompletionDialogState = {
   outputDirectory: string;
   tab: WorkflowTab | 'speech';
   warning?: string;
+};
+
+type LongSpeechConfirmationState = {
+  sourceIds: string[];
+  longFiles: SpeechDurationProbeItem[];
 };
 
 type SpeechLogEntry = {
@@ -93,6 +98,22 @@ const getUnknownErrorMessage = (error: unknown): string => {
   return '操作失败';
 };
 
+const formatDurationText = (durationSeconds: number): string => {
+  const totalMinutes = Math.max(0, Math.round(durationSeconds / 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0 && minutes > 0) {
+    return `${hours} 小时 ${minutes} 分钟`;
+  }
+
+  if (hours > 0) {
+    return `${hours} 小时`;
+  }
+
+  return `${minutes} 分钟`;
+};
+
 export const App = (): JSX.Element => {
   const [activeModule, setActiveModule] = useState<AppModule>('tables');
   const [activeTab, setActiveTab] = useState<WorkflowTab>('split');
@@ -120,6 +141,7 @@ export const App = (): JSX.Element => {
   const [speechProgress, setSpeechProgress] = useState<SpeechTranscriptionProgress>(idleSpeechProgress);
   const [speechLogs, setSpeechLogs] = useState<SpeechLogEntry[]>([]);
   const [isSpeechBusy, setIsSpeechBusy] = useState(false);
+  const [longSpeechConfirmation, setLongSpeechConfirmation] = useState<LongSpeechConfirmationState | null>(null);
 
   const appendLog = useCallback((tab: WorkflowTab, level: LogEntry['level'], message: string): void => {
     setLogs((currentLogs) => ({
@@ -1030,16 +1052,56 @@ export const App = (): JSX.Element => {
     [appendSpeechLog],
   );
 
+  const requestSpeechTranscription = useCallback(
+    async (sourceIds: string[]): Promise<void> => {
+      if (sourceIds.length === 0) {
+        appendSpeechLog('warning', '请先选择需要转写的音频文件');
+        return;
+      }
+
+      const result = await window.officeTools.speech.probeDurations({ sourceIds });
+      if (result.success === false) {
+        appendSpeechLog('error', result.error);
+        return;
+      }
+
+      const longFiles = result.data.items.filter((item) => item.isLongDuration);
+      if (longFiles.length > 0) {
+        setLongSpeechConfirmation({ longFiles, sourceIds });
+        return;
+      }
+
+      await runSpeechFiles(sourceIds);
+    },
+    [appendSpeechLog, runSpeechFiles],
+  );
+
   const startSpeechTranscription = useCallback(async (): Promise<void> => {
-    await runSpeechFiles(speechFiles.map((file) => file.sourceId));
-  }, [runSpeechFiles, speechFiles]);
+    await requestSpeechTranscription(speechFiles.map((file) => file.sourceId));
+  }, [requestSpeechTranscription, speechFiles]);
 
   const retrySpeechFile = useCallback(
     (sourceId: string): void => {
-      void runSpeechFiles([sourceId]);
+      void requestSpeechTranscription([sourceId]);
     },
-    [runSpeechFiles],
+    [requestSpeechTranscription],
   );
+
+  const continueLongSpeechTranscription = useCallback((): void => {
+    const confirmation = longSpeechConfirmation;
+    if (!confirmation) {
+      return;
+    }
+
+    setLongSpeechConfirmation(null);
+    appendSpeechLog('warning', '用户确认继续转写超长音频，处理时间可能较长');
+    void runSpeechFiles(confirmation.sourceIds);
+  }, [appendSpeechLog, longSpeechConfirmation, runSpeechFiles]);
+
+  const cancelLongSpeechTranscription = useCallback((): void => {
+    setLongSpeechConfirmation(null);
+    appendSpeechLog('warning', '已取消超长音频转写');
+  }, [appendSpeechLog]);
 
   const cancelSpeechTranscription = useCallback(async (): Promise<void> => {
     const result = await window.officeTools.jobs.cancelActiveJob();
@@ -1253,6 +1315,22 @@ export const App = (): JSX.Element => {
             ? `${completionDialog.warning} 任务已完成，输出目录：${completionDialog.outputDirectory || '-'}`
             : `任务已完成，输出目录：${completionDialog.outputDirectory || '-'}`}
           title="任务完成"
+        />
+      ) : null}
+      {longSpeechConfirmation ? (
+        <ModalDialog
+          actions={[
+            { label: '不转换', onClick: cancelLongSpeechTranscription },
+            {
+              label: '继续转换',
+              onClick: continueLongSpeechTranscription,
+              variant: 'primary',
+            },
+          ]}
+          description={`以下音频超过 4 小时，转换时间可能比较长：${longSpeechConfirmation.longFiles
+            .map((file) => `${file.name}（${formatDurationText(file.durationSeconds)}）`)
+            .join('、')}。是否继续转换？`}
+          title="音频时长较长"
         />
       ) : null}
       {cancelChoiceTab ? (

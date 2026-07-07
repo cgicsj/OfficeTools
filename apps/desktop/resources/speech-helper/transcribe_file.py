@@ -25,6 +25,13 @@ def _failure(error: str, code: str = "TRANSCRIPTION_FAILED") -> None:
 
 
 def _duration_seconds(audio_path: str) -> float:
+    fake_duration = os.environ.get("OFFICE_TOOLS_SPEECH_FAKE_DURATION_SECONDS")
+    if fake_duration:
+        try:
+            return float(fake_duration)
+        except ValueError:
+            return 0.0
+
     try:
         import librosa
 
@@ -117,14 +124,19 @@ def _transcribe_with_funasr(audio_path: str) -> dict[str, Any]:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        _failure("Usage: transcribe_file.py <audio-path>", "INVALID_ARGUMENTS")
+    probe_duration = len(sys.argv) == 3 and sys.argv[1] == "--probe-duration"
+    if len(sys.argv) != 2 and not probe_duration:
+        _failure("Usage: transcribe_file.py [--probe-duration] <audio-path>", "INVALID_ARGUMENTS")
         return 2
 
-    audio_path = sys.argv[1]
+    audio_path = sys.argv[2] if probe_duration else sys.argv[1]
     if not Path(audio_path).exists():
         _failure(f"音频文件不存在: {audio_path}", "FILE_NOT_FOUND")
         return 1
+
+    if probe_duration:
+        _success({"duration": _duration_seconds(audio_path)})
+        return 0
 
     if os.environ.get("OFFICE_TOOLS_SPEECH_FAKE") == "1":
         name = Path(audio_path).name

@@ -23,6 +23,7 @@ export const IPC_CHANNELS = {
     EVENT: 'job:event',
   },
   SPEECH: {
+    PROBE_DURATIONS: 'speech:probe-durations',
     START_TRANSCRIPTION_JOB: 'speech:start-transcription-job',
     EXPORT_TRANSCRIPTS: 'speech:export-transcripts',
     EVENT: 'speech:event',

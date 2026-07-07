@@ -77,6 +77,49 @@ const parseHelperResult = (stdout: string): HelperResult => {
   return parsed as HelperResult;
 };
 
+
+export const probeAudioDurationSeconds = async (audioPath: string): Promise<number> => {
+  const helperPath = await resolveHelperPath();
+  const pythonExecutable = process.env.OFFICE_TOOLS_PYTHON ?? 'python3';
+
+  return await new Promise<number>((resolve, reject) => {
+    const child = spawn(pythonExecutable, [helperPath, '--probe-duration', audioPath], {
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf8');
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.on('error', (error) => {
+      reject(new Error(`无法启动 Python helper: ${error.message}`));
+    });
+    child.on('close', () => {
+      try {
+        const result = parseHelperResult(stdout);
+        if (result.success === false) {
+          reject(new Error(result.error || stderr || '读取音频时长失败'));
+          return;
+        }
+
+        resolve(result.duration ?? 0);
+      } catch (error) {
+        if (error instanceof Error) {
+          reject(new Error(stderr ? `${error.message}: ${stderr}` : error.message));
+          return;
+        }
+
+        reject(new Error('Python helper 返回解析失败'));
+      }
+    });
+  });
+};
+
 export const transcribeAudioFile = async (audioPath: string, signal: AbortSignal): Promise<SpeechHelperResult> => {
   const helperPath = await resolveHelperPath();
   const pythonExecutable = process.env.OFFICE_TOOLS_PYTHON ?? 'python3';
