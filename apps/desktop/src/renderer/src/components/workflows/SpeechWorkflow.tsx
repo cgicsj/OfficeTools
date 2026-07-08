@@ -69,40 +69,46 @@ export const SpeechWorkflow = ({
 
   return (
     <section className="speech-workflow" aria-label="音频转文字">
-      <section className="workflow-toolbar" aria-label="音频转文字操作">
-        <Button
-          disabled={isBusy}
-          icon={<FileAudio2 size={16} aria-hidden="true" />}
-          onClick={onSelectFiles}
-          variant="primary"
-        >
-          选择音频
-        </Button>
-        <Button
-          disabled={!hasFiles || isBusy}
-          icon={<Play size={16} aria-hidden="true" />}
-          onClick={onStart}
-          variant="primary"
-        >
-          开始转写
-        </Button>
-        <Button disabled={!isBusy} icon={<Square size={16} aria-hidden="true" />} onClick={onCancel} variant="danger">
-          取消
-        </Button>
-        <Button disabled={completedCount === 0} icon={<ClipboardCopy size={16} aria-hidden="true" />} onClick={onCopyAll}>
-          复制全部已完成文本
-        </Button>
-        <Button disabled={isBusy} icon={<FolderOpen size={16} aria-hidden="true" />} onClick={onSelectOutputDirectory}>
-          选择保存路径
-        </Button>
-        <Button disabled={!canExport} icon={<Download size={16} aria-hidden="true" />} onClick={onExport}>
-          导出 TXT
-        </Button>
-        <Button disabled={isBusy} icon={<Settings size={16} aria-hidden="true" />} onClick={onOpenSettings}>
-          模型设置
-        </Button>
-        <div className="output-path speech-workflow__output" title={outputDirectory || '未设置保存路径'}>
-          保存路径：{outputDirectory || '未设置'}
+      <section className="workflow-toolbar speech-toolbar" aria-label="音频转文字操作">
+        <div className="speech-toolbar__group" aria-label="转写操作">
+          <Button
+            disabled={isBusy}
+            icon={<FileAudio2 size={16} aria-hidden="true" />}
+            onClick={onSelectFiles}
+            variant="primary"
+          >
+            选择音频
+          </Button>
+          <Button
+            disabled={!hasFiles || isBusy}
+            icon={<Play size={16} aria-hidden="true" />}
+            onClick={onStart}
+            variant="primary"
+          >
+            开始转写
+          </Button>
+          <Button disabled={!isBusy} icon={<Square size={16} aria-hidden="true" />} onClick={onCancel} variant="danger">
+            取消
+          </Button>
+        </div>
+        <div className="speech-toolbar__group" aria-label="结果操作">
+          <Button disabled={completedCount === 0} icon={<ClipboardCopy size={16} aria-hidden="true" />} onClick={onCopyAll}>
+            复制全部已完成文本
+          </Button>
+          <Button disabled={!canExport} icon={<Download size={16} aria-hidden="true" />} onClick={onExport}>
+            导出 TXT
+          </Button>
+        </div>
+        <div className="speech-toolbar__group speech-toolbar__group--settings" aria-label="设置和输出路径">
+          <Button disabled={isBusy} icon={<FolderOpen size={16} aria-hidden="true" />} onClick={onSelectOutputDirectory}>
+            选择保存路径
+          </Button>
+          <Button disabled={isBusy} icon={<Settings size={16} aria-hidden="true" />} onClick={onOpenSettings}>
+            模型设置
+          </Button>
+          <div className="output-path speech-workflow__output" title={outputDirectory || '未设置保存路径'}>
+            保存路径：{outputDirectory || '未设置'}
+          </div>
         </div>
       </section>
 

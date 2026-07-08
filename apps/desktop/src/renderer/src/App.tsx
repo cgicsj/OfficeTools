@@ -1418,7 +1418,7 @@ export const App = (): JSX.Element => {
             { label: '取消', onClick: closeSpeechModelSettings },
             { label: '保存', onClick: () => { void saveSpeechModelSettings(); }, variant: 'primary' },
           ]}
-          description={`默认地址：${speechModelSettings.defaultModelBaseUrl}。修改后会作为后续模型下载地址。`}
+          description="配置模型下载地址。"
           title="语音模型设置"
         >
           <label className="modal-field">
