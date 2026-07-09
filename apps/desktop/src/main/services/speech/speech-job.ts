@@ -157,7 +157,17 @@ export const runSpeechTranscriptionJob = async (
           throw new Error('音频文件引用已失效，请重新选择文件');
         }
 
-        const helperResult = await transcribeAudioFile(filePath, abortController.signal, modelEnvironment);
+        const helperResult = await transcribeAudioFile(filePath, abortController.signal, modelEnvironment, (message) => {
+          emit({
+            type: 'progress',
+            progress: {
+              currentFileIndex: index + 1,
+              totalFiles: items.length,
+              currentFileName: item.name,
+              message: `${item.name}：${message}`,
+            },
+          });
+        });
         const completedItem = markItem(processingItem, 'completed', {
           transcript: helperResult.text,
           rawText: helperResult.rawText,

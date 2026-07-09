@@ -146,6 +146,8 @@ export const App = (): JSX.Element => {
   const [speechLogs, setSpeechLogs] = useState<SpeechLogEntry[]>([]);
   const [isSpeechBusy, setIsSpeechBusy] = useState(false);
   const [isSpeechStarting, setIsSpeechStarting] = useState(false);
+  const [speechElapsedSeconds, setSpeechElapsedSeconds] = useState(0);
+  const speechStartTimeRef = useRef<number | null>(null);
   const speechRequestLockRef = useRef(false);
   const speechRunLockRef = useRef(false);
   const [longSpeechConfirmation, setLongSpeechConfirmation] = useState<LongSpeechConfirmationState | null>(null);
@@ -171,6 +173,29 @@ export const App = (): JSX.Element => {
       },
     ]);
   }, []);
+
+  useEffect(() => {
+    if (!isSpeechBusy && !isSpeechStarting) {
+      speechStartTimeRef.current = null;
+      setSpeechElapsedSeconds(0);
+      return undefined;
+    }
+
+    if (speechStartTimeRef.current === null) {
+      speechStartTimeRef.current = Date.now();
+      setSpeechElapsedSeconds(0);
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (speechStartTimeRef.current !== null) {
+        setSpeechElapsedSeconds(Math.floor((Date.now() - speechStartTimeRef.current) / 1000));
+      }
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isSpeechBusy, isSpeechStarting]);
 
 
   useEffect(() => {
@@ -1355,6 +1380,7 @@ export const App = (): JSX.Element => {
           <SpeechWorkflow
             canExport={canExportSpeech}
             files={speechFiles}
+            elapsedSeconds={speechElapsedSeconds}
             isBusy={isSpeechBusy}
             isStarting={isSpeechStarting}
             logs={speechLogs}

@@ -24,6 +24,10 @@ def _failure(error: str, code: str = "TRANSCRIPTION_FAILED") -> None:
     print(json.dumps({"success": False, "error": error, "code": code}, ensure_ascii=False), flush=True)
 
 
+def _progress(message: str) -> None:
+    print(json.dumps({"type": "progress", "message": message}, ensure_ascii=False), file=sys.stderr, flush=True)
+
+
 def _duration_seconds(audio_path: str) -> float:
     fake_duration = os.environ.get("OFFICE_TOOLS_SPEECH_FAKE_DURATION_SECONDS")
     if fake_duration:
@@ -71,6 +75,7 @@ def _model_dir_from_env(name: str) -> str:
 
 
 def _transcribe_with_funasr(audio_path: str) -> dict[str, Any]:
+    _progress("正在加载 FunASR 运行库")
     try:
         from funasr_onnx.paraformer_bin import Paraformer
     except Exception as exc:
@@ -82,6 +87,7 @@ def _transcribe_with_funasr(audio_path: str) -> dict[str, Any]:
     use_quantize = (Path(asr_model_dir) / "model_quant.onnx").exists()
     num_threads = int(os.environ.get("OMP_NUM_THREADS", "4"))
     start = time.time()
+    _progress("正在加载 ASR 模型")
     model = Paraformer(
         asr_model_dir,
         batch_size=1,
@@ -89,12 +95,14 @@ def _transcribe_with_funasr(audio_path: str) -> dict[str, Any]:
         quantize=use_quantize,
         intra_op_num_threads=num_threads,
     )
+    _progress("正在识别音频内容")
     raw_text = _extract_text(model([audio_path]))
     text = raw_text
 
     punc_model_dir = os.environ.get("OFFICE_TOOLS_FUNASR_PUNC_MODEL_DIR")
     if punc_model_dir and raw_text.strip():
         try:
+            _progress("正在加载标点模型")
             from funasr_onnx.punc_bin import CT_Transformer
 
             punc_dir = _model_dir_from_env("OFFICE_TOOLS_FUNASR_PUNC_MODEL_DIR")
@@ -105,6 +113,7 @@ def _transcribe_with_funasr(audio_path: str) -> dict[str, Any]:
                 quantize=punc_quantize,
                 intra_op_num_threads=num_threads,
             )
+            _progress("正在添加标点")
             punc_result = punc_model(raw_text)
             if isinstance(punc_result, tuple) and punc_result:
                 text = str(punc_result[0])
@@ -113,6 +122,7 @@ def _transcribe_with_funasr(audio_path: str) -> dict[str, Any]:
         except Exception:
             text = raw_text
 
+    _progress("正在整理转写结果")
     return {
         "text": text,
         "raw_text": raw_text,
@@ -135,10 +145,12 @@ def main() -> int:
         return 1
 
     if probe_duration:
+        _progress("正在读取音频时长")
         _success({"duration": _duration_seconds(audio_path)})
         return 0
 
     if os.environ.get("OFFICE_TOOLS_SPEECH_FAKE") == "1":
+        _progress("正在生成测试转写结果")
         name = Path(audio_path).name
         _success(
             {

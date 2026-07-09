@@ -333,6 +333,7 @@ test('transcribes speech files with fake helper and continues after unsupported 
     assert.equal(result.items[2]?.status, 'completed');
     assert.match(result.items[2]?.transcript ?? '', /interview\.flac/);
     assert.ok(events.some((event) => event.type === 'progress' && event.progress.message === '批量转写完成'));
+    assert.ok(events.some((event) => event.type === 'progress' && event.progress.message?.includes('正在生成测试转写结果')));
 
     const outputDirectory = path.join(workspace, 'transcripts');
     await mkdir(outputDirectory, { recursive: true });

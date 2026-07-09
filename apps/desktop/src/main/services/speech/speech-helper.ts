@@ -20,6 +20,13 @@ type HelperFailure = {
 
 type HelperResult = HelperSuccess | HelperFailure;
 
+type HelperProgress = {
+  type: 'progress';
+  message: string;
+};
+
+type EmitHelperProgress = (message: string) => void;
+
 export type SpeechHelperResult = {
   text: string;
   rawText: string;
@@ -88,6 +95,29 @@ const resolvePythonExecutable = async (): Promise<string> => {
   return (await resolveBundledPythonPath()) ?? 'python3';
 };
 
+const isHelperProgress = (value: unknown): value is HelperProgress => {
+  return typeof value === 'object' &&
+    value !== null &&
+    'type' in value &&
+    'message' in value &&
+    (value as { type: unknown }).type === 'progress' &&
+    typeof (value as { message: unknown }).message === 'string';
+};
+
+const parseHelperProgressLine = (line: string, onProgress: EmitHelperProgress): boolean => {
+  try {
+    const parsed: unknown = JSON.parse(line);
+    if (isHelperProgress(parsed)) {
+      onProgress(parsed.message);
+      return true;
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
+};
+
 const parseHelperResult = (stdout: string): HelperResult => {
   const lines = stdout
     .split('\n')
@@ -153,6 +183,7 @@ export const transcribeAudioFile = async (
   audioPath: string,
   signal: AbortSignal,
   extraEnv: NodeJS.ProcessEnv = {},
+  onProgress: EmitHelperProgress = () => undefined,
 ): Promise<SpeechHelperResult> => {
   const helperPath = await resolveHelperPath();
   const pythonExecutable = await resolvePythonExecutable();
@@ -164,7 +195,30 @@ export const transcribeAudioFile = async (
     });
     let stdout = '';
     let stderr = '';
+    let stderrBuffer = '';
     let settled = false;
+
+    const appendStderrLine = (line: string): void => {
+      const trimmedLine = line.trim();
+      if (trimmedLine.length === 0) {
+        return;
+      }
+
+      if (parseHelperProgressLine(trimmedLine, onProgress)) {
+        return;
+      }
+
+      stderr += `${line}\n`;
+    };
+
+    const flushStderrProgress = (): void => {
+      if (stderrBuffer.length === 0) {
+        return;
+      }
+
+      appendStderrLine(stderrBuffer);
+      stderrBuffer = '';
+    };
 
     const finish = (callback: () => void): void => {
       if (settled) {
@@ -193,7 +247,10 @@ export const transcribeAudioFile = async (
       stdout += chunk.toString('utf8');
     });
     child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString('utf8');
+      stderrBuffer += chunk.toString('utf8');
+      const lines = stderrBuffer.split(/\r?\n/);
+      stderrBuffer = lines.pop() ?? '';
+      lines.forEach(appendStderrLine);
     });
     child.on('error', (error) => {
       finish(() => {
@@ -201,6 +258,7 @@ export const transcribeAudioFile = async (
       });
     });
     child.on('close', () => {
+      flushStderrProgress();
       finish(() => {
         try {
           const result = parseHelperResult(stdout);

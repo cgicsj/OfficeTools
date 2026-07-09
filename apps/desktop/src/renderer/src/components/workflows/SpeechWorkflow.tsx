@@ -1,6 +1,6 @@
 import { ClipboardCopy, Copy, Download, FileAudio2, FolderOpen, Play, RotateCcw, Settings, Square } from 'lucide-react';
 import type { SpeechTranscriptionItem, SpeechTranscriptionProgress } from '@shared/types/speech';
-import { formatBytes } from '../../lib/format';
+import { formatBytes, formatDurationSeconds } from '../../lib/format';
 import { Button } from '../ui/Button';
 
 type SpeechLogEntry = {
@@ -12,6 +12,7 @@ type SpeechLogEntry = {
 
 type SpeechWorkflowProps = {
   canExport: boolean;
+  elapsedSeconds: number;
   files: SpeechTranscriptionItem[];
   isBusy: boolean;
   isStarting: boolean;
@@ -48,6 +49,7 @@ const formatTime = (timestampMs: number): string => {
 
 export const SpeechWorkflow = ({
   canExport,
+  elapsedSeconds,
   files,
   isBusy,
   isStarting,
@@ -126,6 +128,7 @@ export const SpeechWorkflow = ({
         <span>总计 {files.length} 个文件</span>
         <span>已完成 {completedCount} 个</span>
         <span>失败 {failedCount} 个</span>
+        {isActionLocked ? <span>已用时 {formatDurationSeconds(elapsedSeconds)}</span> : null}
         <span>{progress.message ?? '等待处理'}</span>
       </div>
 
@@ -214,7 +217,15 @@ export const SpeechWorkflow = ({
                     ) : null}
                   </header>
                   {file.status === 'completed' ? (
-                    <p className="speech-result-card__text">{file.transcript || '（空结果）'}</p>
+                    <>
+                      <p className="speech-result-card__text">{file.transcript || '（空结果）'}</p>
+                      {file.rawText.trim().length > 0 && file.rawText.trim() !== file.transcript.trim() ? (
+                        <details className="speech-result-card__raw">
+                          <summary>查看未加标点原始识别文本</summary>
+                          <p>{file.rawText}</p>
+                        </details>
+                      ) : null}
+                    </>
                   ) : (
                     <p className="speech-result-card__error">{file.error ?? statusLabel[file.status]}</p>
                   )}

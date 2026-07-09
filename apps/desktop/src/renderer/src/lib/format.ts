@@ -19,3 +19,15 @@ export const formatTime = (timestampMs: number): string => {
   });
 };
 
+
+export const formatDurationSeconds = (totalSeconds: number): string => {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+
+  if (minutes === 0) {
+    return `${seconds} 秒`;
+  }
+
+  return `${minutes} 分 ${seconds.toString().padStart(2, '0')} 秒`;
+};
