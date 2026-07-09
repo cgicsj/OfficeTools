@@ -8,3 +8,6 @@ out/
 coverage/
 app-dev.db
 apps/desktop/.functional-tests/
+
+apps/desktop/resources/speech-models/*.zip
+apps/desktop/resources/speech-runtime/

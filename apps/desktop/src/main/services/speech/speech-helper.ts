@@ -29,6 +29,7 @@ export type SpeechHelperResult = {
 };
 
 const helperRelativePath = path.join('resources', 'speech-helper', 'transcribe_file.py');
+const runtimePythonRelativePath = path.join('resources', 'speech-runtime', 'bin', 'python');
 
 const fileExists = async (filePath: string): Promise<boolean> => {
   try {
@@ -59,6 +60,34 @@ const resolveHelperPath = async (): Promise<string> => {
   throw new Error('未找到语音转文字 Python helper，请检查应用资源是否完整');
 };
 
+const resolveBundledPythonPath = async (): Promise<string | undefined> => {
+  const candidates = [
+    path.join(process.cwd(), runtimePythonRelativePath),
+    path.join(process.cwd(), 'apps', 'desktop', runtimePythonRelativePath),
+    path.join(app.getAppPath(), runtimePythonRelativePath),
+  ];
+
+  if (process.resourcesPath) {
+    candidates.push(path.join(process.resourcesPath, 'speech-runtime', 'bin', 'python'));
+  }
+
+  for (const candidate of candidates) {
+    if (await fileExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+};
+
+const resolvePythonExecutable = async (): Promise<string> => {
+  if (process.env.OFFICE_TOOLS_PYTHON) {
+    return process.env.OFFICE_TOOLS_PYTHON;
+  }
+
+  return (await resolveBundledPythonPath()) ?? 'python3';
+};
+
 const parseHelperResult = (stdout: string): HelperResult => {
   const lines = stdout
     .split('\n')
@@ -80,7 +109,7 @@ const parseHelperResult = (stdout: string): HelperResult => {
 
 export const probeAudioDurationSeconds = async (audioPath: string): Promise<number> => {
   const helperPath = await resolveHelperPath();
-  const pythonExecutable = process.env.OFFICE_TOOLS_PYTHON ?? 'python3';
+  const pythonExecutable = await resolvePythonExecutable();
 
   return await new Promise<number>((resolve, reject) => {
     const child = spawn(pythonExecutable, [helperPath, '--probe-duration', audioPath], {
@@ -126,7 +155,7 @@ export const transcribeAudioFile = async (
   extraEnv: NodeJS.ProcessEnv = {},
 ): Promise<SpeechHelperResult> => {
   const helperPath = await resolveHelperPath();
-  const pythonExecutable = process.env.OFFICE_TOOLS_PYTHON ?? 'python3';
+  const pythonExecutable = await resolvePythonExecutable();
 
   return await new Promise<SpeechHelperResult>((resolve, reject) => {
     const child = spawn(pythonExecutable, [helperPath, audioPath], {

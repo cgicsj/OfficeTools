@@ -14,6 +14,7 @@ type SpeechWorkflowProps = {
   canExport: boolean;
   files: SpeechTranscriptionItem[];
   isBusy: boolean;
+  isStarting: boolean;
   logs: SpeechLogEntry[];
   onCancel: () => void;
   onCopyAll: () => void;
@@ -49,6 +50,7 @@ export const SpeechWorkflow = ({
   canExport,
   files,
   isBusy,
+  isStarting,
   logs,
   onCancel,
   onCopyAll,
@@ -66,13 +68,14 @@ export const SpeechWorkflow = ({
   const completedCount = files.filter((file) => file.status === 'completed').length;
   const failedCount = files.filter((file) => file.status === 'failed').length;
   const hasFiles = files.length > 0;
+  const isActionLocked = isBusy || isStarting;
 
   return (
     <section className="speech-workflow" aria-label="音频转文字">
       <section className="workflow-toolbar speech-toolbar" aria-label="音频转文字操作">
         <div className="speech-toolbar__group" aria-label="转写操作">
           <Button
-            disabled={isBusy}
+            disabled={isActionLocked}
             icon={<FileAudio2 size={16} aria-hidden="true" />}
             onClick={onSelectFiles}
             variant="primary"
@@ -80,12 +83,12 @@ export const SpeechWorkflow = ({
             选择音频
           </Button>
           <Button
-            disabled={!hasFiles || isBusy}
+            disabled={!hasFiles || isActionLocked}
             icon={<Play size={16} aria-hidden="true" />}
             onClick={onStart}
             variant="primary"
           >
-            开始转写
+            {isStarting ? '准备中…' : isBusy ? '转写中…' : '开始转写'}
           </Button>
           <Button disabled={!isBusy} icon={<Square size={16} aria-hidden="true" />} onClick={onCancel} variant="danger">
             取消
@@ -100,10 +103,10 @@ export const SpeechWorkflow = ({
           </Button>
         </div>
         <div className="speech-toolbar__group speech-toolbar__group--settings" aria-label="设置和输出路径">
-          <Button disabled={isBusy} icon={<FolderOpen size={16} aria-hidden="true" />} onClick={onSelectOutputDirectory}>
+          <Button disabled={isActionLocked} icon={<FolderOpen size={16} aria-hidden="true" />} onClick={onSelectOutputDirectory}>
             选择保存路径
           </Button>
-          <Button disabled={isBusy} icon={<Settings size={16} aria-hidden="true" />} onClick={onOpenSettings}>
+          <Button disabled={isActionLocked} icon={<Settings size={16} aria-hidden="true" />} onClick={onOpenSettings}>
             模型设置
           </Button>
           <div className="output-path speech-workflow__output" title={outputDirectory || '未设置保存路径'}>
@@ -113,6 +116,13 @@ export const SpeechWorkflow = ({
       </section>
 
       <div className="speech-workflow__summary" aria-live="polite">
+        {isActionLocked ? (
+          <span className="speech-workflow__busy-notice" role="status">
+            {isStarting
+              ? '正在检查模型和音频时长，请勿重复点击开始按钮。'
+              : '正在转写音频，请等待当前任务完成或点击“取消”，不要重复点击开始按钮。'}
+          </span>
+        ) : null}
         <span>总计 {files.length} 个文件</span>
         <span>已完成 {completedCount} 个</span>
         <span>失败 {failedCount} 个</span>
@@ -151,7 +161,7 @@ export const SpeechWorkflow = ({
                     <button
                       aria-label={`重试 ${file.name}`}
                       className="file-list__remove"
-                      disabled={isBusy}
+                      disabled={isActionLocked}
                       onClick={() => onRetryFile(file.sourceId)}
                       title="重试"
                       type="button"
@@ -162,7 +172,7 @@ export const SpeechWorkflow = ({
                     <button
                       aria-label={`移除 ${file.name}`}
                       className="file-list__remove"
-                      disabled={isBusy}
+                      disabled={isActionLocked}
                       onClick={() => onRemoveFile(file.sourceId)}
                       title="移除"
                       type="button"

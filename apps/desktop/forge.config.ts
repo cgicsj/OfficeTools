@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
@@ -6,7 +7,11 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    extraResource: ['./resources/speech-helper', './resources/speech-models'],
+    extraResource: [
+      './resources/speech-helper',
+      './resources/speech-models/config.json',
+      './resources/speech-runtime',
+    ].filter((resourcePath) => existsSync(resourcePath)),
     executableName: 'office-tools',
     name: 'OfficeTools',
   },
@@ -25,6 +30,7 @@ const config: ForgeConfig = {
           bin: 'office-tools',
           section: 'utils',
           priority: 'optional',
+          depends: ['python3'],
           categories: ['Office', 'Utility'],
           mimeType: [
             'application/vnd.ms-excel',

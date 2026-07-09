@@ -1,5 +1,5 @@
 {
-  "modelBaseUrl": "https://2.22.2.2",
+  "modelBaseUrl": "http://83.12.73.136:7003/funasr",
   "asrPackageName": "funasr-asr-model.zip",
   "puncPackageName": "funasr-punc-model.zip"
 }

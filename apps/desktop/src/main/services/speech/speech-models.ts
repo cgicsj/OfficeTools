@@ -1,6 +1,6 @@
 import { app } from 'electron';
 import { createWriteStream } from 'node:fs';
-import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import https from 'node:https';
 import path from 'node:path';
@@ -52,7 +52,10 @@ const readDefaultConfig = async (): Promise<SpeechModelDefaultConfig> => {
   ];
 
   if (process.resourcesPath) {
-    candidates.push(path.join(process.resourcesPath, 'speech-models', 'config.json'));
+    candidates.push(
+      path.join(process.resourcesPath, 'speech-models', 'config.json'),
+      path.join(process.resourcesPath, 'config.json'),
+    );
   }
 
   for (const candidate of candidates) {
@@ -81,6 +84,40 @@ const getModelDirectory = (kind: ModelKind): string => {
 const hasOnnxModel = async (directory: string): Promise<boolean> => {
   return (await fileExists(path.join(directory, 'model.onnx'))) ||
     (await fileExists(path.join(directory, 'model_quant.onnx')));
+};
+
+const ensureModelRuntimeFiles = async (directory: string, kind: ModelKind): Promise<void> => {
+  const configPath = path.join(directory, 'config.yaml');
+  if (!(await fileExists(configPath))) {
+    const legacyConfigPath = path.join(directory, kind === 'asr' ? 'asr.yaml' : 'punc.yaml');
+    if (await fileExists(legacyConfigPath)) {
+      await copyFile(legacyConfigPath, configPath);
+    }
+  }
+
+  const tokensJsonPath = path.join(directory, 'tokens.json');
+  if (await fileExists(tokensJsonPath)) {
+    return;
+  }
+
+  const tokensTextPath = path.join(directory, 'tokens.txt');
+  if (await fileExists(tokensTextPath)) {
+    const tokens = (await readFile(tokensTextPath, 'utf8'))
+      .split(/\r?\n/)
+      .map((token) => token.replace(/^\uFEFF/, '').trim())
+      .filter(Boolean);
+    await writeFile(tokensJsonPath, `${JSON.stringify(tokens, null, 2)}\n`);
+  }
+};
+
+const isModelReady = async (directory: string, kind: ModelKind): Promise<boolean> => {
+  if (!(await hasOnnxModel(directory))) {
+    return false;
+  }
+
+  await ensureModelRuntimeFiles(directory, kind);
+  return (await fileExists(path.join(directory, 'config.yaml'))) &&
+    (await fileExists(path.join(directory, 'tokens.json')));
 };
 
 const joinUrl = (baseUrl: string, fileName: string): string => {
@@ -115,8 +152,8 @@ export const updateSpeechModelSettings = async (modelBaseUrl: string): Promise<S
 
 export const getSpeechModelStatus = async (): Promise<SpeechModelStatus> => {
   const settings = await getSpeechModelSettings();
-  const asrReady = await hasOnnxModel(getModelDirectory('asr'));
-  const puncReady = await hasOnnxModel(getModelDirectory('punc'));
+  const asrReady = await isModelReady(getModelDirectory('asr'), 'asr');
+  const puncReady = await isModelReady(getModelDirectory('punc'), 'punc');
 
   return {
     asrReady,
@@ -243,6 +280,14 @@ const extractPackage = async (zipPath: string, targetDirectory: string): Promise
     throw new Error('模型压缩包中未找到 model.onnx 或 model_quant.onnx');
   }
 
+  await ensureModelRuntimeFiles(modelDirectory, path.basename(targetDirectory) === 'asr' ? 'asr' : 'punc');
+  if (!(await fileExists(path.join(modelDirectory, 'config.yaml')))) {
+    throw new Error('模型压缩包中未找到 config.yaml、asr.yaml 或 punc.yaml');
+  }
+  if (!(await fileExists(path.join(modelDirectory, 'tokens.json')))) {
+    throw new Error('模型压缩包中未找到 tokens.json 或 tokens.txt');
+  }
+
   await rm(targetDirectory, { force: true, recursive: true });
   await mkdir(path.dirname(targetDirectory), { recursive: true });
   await import('node:fs/promises').then((fs) => fs.rename(modelDirectory, targetDirectory));
@@ -275,9 +320,11 @@ const ensureOneModel = async (
   emit: EmitModelProgress,
 ): Promise<void> => {
   const targetDirectory = getModelDirectory(kind);
-  if (await hasOnnxModel(targetDirectory)) {
+  if (await isModelReady(targetDirectory, kind)) {
     return;
   }
+
+  await rm(targetDirectory, { force: true, recursive: true });
 
   const packageName = getPackageName(settings, kind);
   const packageUrl = resolvePackageUrl(settings, kind);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MergeMode, ParsedWorkbook, StartMergeJobInput, StartSplitJobInput } from '@shared/types/excel';
 import type { FileListItem, SelectedFile, SelectedFolder } from '@shared/types/files';
 import type { JobProgress, LogEntry, WorkflowTab } from '@shared/types/jobs';
@@ -145,6 +145,9 @@ export const App = (): JSX.Element => {
   const [speechProgress, setSpeechProgress] = useState<SpeechTranscriptionProgress>(idleSpeechProgress);
   const [speechLogs, setSpeechLogs] = useState<SpeechLogEntry[]>([]);
   const [isSpeechBusy, setIsSpeechBusy] = useState(false);
+  const [isSpeechStarting, setIsSpeechStarting] = useState(false);
+  const speechRequestLockRef = useRef(false);
+  const speechRunLockRef = useRef(false);
   const [longSpeechConfirmation, setLongSpeechConfirmation] = useState<LongSpeechConfirmationState | null>(null);
   const [modelDownloadConfirmation, setModelDownloadConfirmation] = useState<ModelDownloadConfirmationState | null>(null);
   const [speechModelSettings, setSpeechModelSettings] = useState<SpeechModelSettings | null>(null);
@@ -1029,6 +1032,12 @@ export const App = (): JSX.Element => {
         return;
       }
 
+      if (speechRunLockRef.current) {
+        appendSpeechLog('warning', '正在转写，请勿重复点击开始按钮');
+        return;
+      }
+
+      speechRunLockRef.current = true;
       setIsSpeechBusy(true);
       setSpeechFiles((currentFiles) =>
         currentFiles.map((file) =>
@@ -1068,6 +1077,7 @@ export const App = (): JSX.Element => {
       } catch (error) {
         appendSpeechLog('error', getUnknownErrorMessage(error));
       } finally {
+        speechRunLockRef.current = false;
         setIsSpeechBusy(false);
       }
     },
@@ -1081,30 +1091,50 @@ export const App = (): JSX.Element => {
         return;
       }
 
-      const modelStatus = await window.officeTools.speech.getModelStatus();
-      if (modelStatus.success === false) {
-        appendSpeechLog('error', modelStatus.error);
+      if (speechRequestLockRef.current || speechRunLockRef.current) {
+        appendSpeechLog('warning', '正在准备或转写，请勿重复点击开始按钮');
         return;
       }
 
-      if (!modelStatus.data.ready) {
-        setModelDownloadConfirmation({ sourceIds });
-        return;
-      }
+      speechRequestLockRef.current = true;
+      setIsSpeechStarting(true);
+      setSpeechProgress({
+        currentFileIndex: 0,
+        message: '正在检查模型和音频时长',
+        totalFiles: sourceIds.length,
+      });
 
-      const result = await window.officeTools.speech.probeDurations({ sourceIds });
-      if (result.success === false) {
-        appendSpeechLog('error', result.error);
-        return;
-      }
+      try {
+        const modelStatus = await window.officeTools.speech.getModelStatus();
+        if (modelStatus.success === false) {
+          appendSpeechLog('error', modelStatus.error);
+          return;
+        }
 
-      const longFiles = result.data.items.filter((item) => item.isLongDuration);
-      if (longFiles.length > 0) {
-        setLongSpeechConfirmation({ longFiles, sourceIds });
-        return;
-      }
+        if (!modelStatus.data.ready) {
+          setModelDownloadConfirmation({ sourceIds });
+          return;
+        }
 
-      await runSpeechFiles(sourceIds);
+        const result = await window.officeTools.speech.probeDurations({ sourceIds });
+        if (result.success === false) {
+          appendSpeechLog('error', result.error);
+          return;
+        }
+
+        const longFiles = result.data.items.filter((item) => item.isLongDuration);
+        if (longFiles.length > 0) {
+          setLongSpeechConfirmation({ longFiles, sourceIds });
+          return;
+        }
+
+        speechRequestLockRef.current = false;
+        setIsSpeechStarting(false);
+        await runSpeechFiles(sourceIds);
+      } finally {
+        speechRequestLockRef.current = false;
+        setIsSpeechStarting(false);
+      }
     },
     [appendSpeechLog, runSpeechFiles],
   );
@@ -1326,6 +1356,7 @@ export const App = (): JSX.Element => {
             canExport={canExportSpeech}
             files={speechFiles}
             isBusy={isSpeechBusy}
+            isStarting={isSpeechStarting}
             logs={speechLogs}
             onCancel={cancelSpeechTranscription}
             onCopyAll={() => {

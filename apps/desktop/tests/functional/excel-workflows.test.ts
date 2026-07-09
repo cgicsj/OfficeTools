@@ -257,14 +257,16 @@ test('downloads and extracts speech model packages from configured address', asy
     const remoteDirectory = path.join(workspace, 'remote');
     await mkdir(remoteDirectory, { recursive: true });
 
-    const createModelPackage = async (packagePath: string, entryPath: string): Promise<void> => {
+    const createModelPackage = async (packagePath: string, rootDirectory: string, onnxFileName: string, configFileName: string): Promise<void> => {
       const zip = new JSZip();
-      zip.file(entryPath, 'fake onnx content');
+      zip.file(`${rootDirectory}/${onnxFileName}`, 'fake onnx content');
+      zip.file(`${rootDirectory}/${configFileName}`, 'fake config content');
+      zip.file(`${rootDirectory}/tokens.txt`, 'token-a\ntoken-b\n');
       await writeFile(packagePath, await zip.generateAsync({ type: 'nodebuffer' }));
     };
 
-    await createModelPackage(path.join(remoteDirectory, 'funasr-asr-model.zip'), 'asr-model/model_quant.onnx');
-    await createModelPackage(path.join(remoteDirectory, 'funasr-punc-model.zip'), 'punc-model/model.onnx');
+    await createModelPackage(path.join(remoteDirectory, 'funasr-asr-model.zip'), 'asr-model', 'model_quant.onnx', 'asr.yaml');
+    await createModelPackage(path.join(remoteDirectory, 'funasr-punc-model.zip'), 'punc-model', 'model.onnx', 'punc.yaml');
 
     await updateSpeechModelSettings(pathToFileURL(remoteDirectory).toString());
     const beforeStatus = await getSpeechModelStatus();
